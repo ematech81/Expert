@@ -18,7 +18,7 @@ import {
   Search, MapPin, Star, Phone, Mail, Globe, Linkedin, Twitter,
   Users, Award, CheckCircle, Clock, Filter, ChevronRight, Menu, X, LogOut,
   Building, Briefcase, Heart, Shield, TrendingUp, Eye, MousePointer,
-  User, Settings, BarChart3, FileCheck, XCircle, Loader2
+  User, Settings, BarChart3, FileCheck, XCircle, Loader2, Edit, BadgeCheck
 } from 'lucide-react'
 
 const CATEGORIES = [
@@ -46,8 +46,23 @@ const CATEGORIES = [
 
 const HERO_IMAGE = 'https://images.pexels.com/photos/7616608/pexels-photo-7616608.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
 
+// Helper function to get the appropriate badge for a professional
+function getProfessionalBadge(professional) {
+  // Verified badge only for featured/paid professionals
+  if (professional.featured?.isFeatured && professional.featured?.featuredUntil && new Date(professional.featured.featuredUntil) > new Date()) {
+    return { label: 'Verified', variant: 'default', className: 'bg-blue-500', icon: BadgeCheck }
+  }
+  // Approved badge for approved but not featured professionals
+  if (professional.verification?.status === 'approved') {
+    return { label: 'Approved', variant: 'secondary', className: 'bg-green-500 text-white', icon: CheckCircle }
+  }
+  return null
+}
+
 // Professional Card Component
 const ProfessionalCard = memo(function ProfessionalCard({ professional, onClick }) {
+  const badge = getProfessionalBadge(professional)
+  
   return (
     <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group" onClick={onClick}>
       <CardHeader className="pb-3">
@@ -61,8 +76,11 @@ const ProfessionalCard = memo(function ProfessionalCard({ professional, onClick 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <CardTitle className="text-lg truncate">{professional.fullName}</CardTitle>
-              {professional.verification?.status === 'approved' && (
-                <CheckCircle className="h-4 w-4 text-blue-500 flex-shrink-0" />
+              {badge && (
+                <Badge className={badge.className}>
+                  <badge.icon className="h-3 w-3 mr-1" />
+                  {badge.label}
+                </Badge>
               )}
             </div>
             <CardDescription className="flex items-center gap-1">
@@ -320,7 +338,148 @@ function RegisterDialog({ open, onOpenChange, onRegister, isLoading }) {
   )
 }
 
-// Hero Search Component - separate to prevent re-renders
+// Edit Profile Dialog Component
+function EditProfileDialog({ open, onOpenChange, user, onSave, isLoading }) {
+  const [form, setForm] = useState({
+    fullName: user?.fullName || '',
+    phone: user?.phone || '',
+    subcategory: user?.subcategory || '',
+    bio: user?.bio || '',
+    experience: user?.experience?.toString() || '',
+    country: user?.location?.country || '',
+    state: user?.location?.state || '',
+    city: user?.location?.city || '',
+    inPerson: user?.serviceOptions?.inPerson || false,
+    virtual: user?.serviceOptions?.virtual || true,
+    languages: user?.languages?.join(', ') || 'English',
+    linkedin: user?.socialLinks?.linkedin || '',
+    twitter: user?.socialLinks?.twitter || '',
+    website: user?.socialLinks?.website || ''
+  })
+
+  useEffect(() => {
+    if (user) {
+      setForm({
+        fullName: user.fullName || '',
+        phone: user.phone || '',
+        subcategory: user.subcategory || '',
+        bio: user.bio || '',
+        experience: user.experience?.toString() || '',
+        country: user.location?.country || '',
+        state: user.location?.state || '',
+        city: user.location?.city || '',
+        inPerson: user.serviceOptions?.inPerson || false,
+        virtual: user.serviceOptions?.virtual || true,
+        languages: user.languages?.join(', ') || 'English',
+        linkedin: user.socialLinks?.linkedin || '',
+        twitter: user.socialLinks?.twitter || '',
+        website: user.socialLinks?.website || ''
+      })
+    }
+  }, [user])
+
+  const handleSubmit = () => {
+    onSave(form)
+  }
+
+  const updateForm = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Profile</DialogTitle>
+          <DialogDescription>Update your professional information</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Full Name</Label>
+              <Input id="edit-name" value={form.fullName} onChange={(e) => updateForm('fullName', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone</Label>
+              <Input id="edit-phone" value={form.phone} onChange={(e) => updateForm('phone', e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-subcategory">Specialization</Label>
+              <Input id="edit-subcategory" value={form.subcategory} onChange={(e) => updateForm('subcategory', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-experience">Years of Experience</Label>
+              <Input id="edit-experience" type="number" min="0" value={form.experience} onChange={(e) => updateForm('experience', e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-bio">Professional Bio</Label>
+            <Textarea id="edit-bio" className="min-h-[100px]" value={form.bio} onChange={(e) => updateForm('bio', e.target.value)} />
+          </div>
+          <Separator />
+          <h4 className="font-medium">Location</h4>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-country">Country</Label>
+              <Input id="edit-country" value={form.country} onChange={(e) => updateForm('country', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-state">State/Region</Label>
+              <Input id="edit-state" value={form.state} onChange={(e) => updateForm('state', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-city">City</Label>
+              <Input id="edit-city" value={form.city} onChange={(e) => updateForm('city', e.target.value)} />
+            </div>
+          </div>
+          <Separator />
+          <h4 className="font-medium">Service Options</h4>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox id="edit-virtual" checked={form.virtual} onCheckedChange={(checked) => updateForm('virtual', checked)} />
+              <Label htmlFor="edit-virtual">Virtual consultations</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox id="edit-inperson" checked={form.inPerson} onCheckedChange={(checked) => updateForm('inPerson', checked)} />
+              <Label htmlFor="edit-inperson">In-person meetings</Label>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-languages">Languages (comma-separated)</Label>
+            <Input id="edit-languages" value={form.languages} onChange={(e) => updateForm('languages', e.target.value)} />
+          </div>
+          <Separator />
+          <h4 className="font-medium">Social Links</h4>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-linkedin">LinkedIn URL</Label>
+              <Input id="edit-linkedin" value={form.linkedin} onChange={(e) => updateForm('linkedin', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-twitter">Twitter URL</Label>
+              <Input id="edit-twitter" value={form.twitter} onChange={(e) => updateForm('twitter', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-website">Website URL</Label>
+              <Input id="edit-website" value={form.website} onChange={(e) => updateForm('website', e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Save Changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Hero Search Component
 function HeroSearch({ onSearch }) {
   const [category, setCategory] = useState('')
   const [location, setLocation] = useState('')
@@ -477,13 +636,16 @@ function AdminPendingCard({ professional, onApprove, onReject }) {
   )
 }
 
-// Review Form Component
-function ReviewForm({ professionalId, onSubmit }) {
+// Review Form Component - Only for visitors, not for the profile owner
+function ReviewForm({ professionalId, onSubmit, isVisible }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+
+  if (!isVisible) return null
 
   const handleSubmit = async () => {
     if (!name || !email || !comment) {
@@ -491,45 +653,131 @@ function ReviewForm({ professionalId, onSubmit }) {
       return
     }
     setIsSubmitting(true)
-    await onSubmit({ clientName: name, clientEmail: email, rating, comment, professionalId })
-    setName('')
-    setEmail('')
-    setRating(5)
-    setComment('')
+    const success = await onSubmit({ clientName: name, clientEmail: email, rating, comment, professionalId })
+    if (success) {
+      setName('')
+      setEmail('')
+      setRating(5)
+      setComment('')
+      setShowForm(false)
+    }
     setIsSubmitting(false)
   }
 
   return (
-    <Card className="mb-6 border-dashed">
-      <CardContent className="pt-4 space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Your Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label>Your Email</Label>
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Rating</Label>
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button key={star} type="button" onClick={() => setRating(star)}>
-                <Star className={`h-6 w-6 ${star <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Your Review</Label>
-          <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Share your experience..." />
-        </div>
-        <Button onClick={handleSubmit} disabled={isSubmitting}>
-          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-          Submit Review
+    <div className="mb-6">
+      {!showForm ? (
+        <Button size="sm" onClick={() => setShowForm(true)}>
+          Write a Review
         </Button>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="pt-4 space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="font-medium">Write a Review</h4>
+              <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Your Name</Label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Your Email</Label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Rating</Label>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button key={star} type="button" onClick={() => setRating(star)}>
+                    <Star className={`h-6 w-6 ${star <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Your Review</Label>
+              <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Share your experience..." />
+            </div>
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Submit Review
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// Reviews Section Component with View More functionality
+function ReviewsSection({ reviews, professionalId, currentUserId, onSubmitReview }) {
+  const [showAll, setShowAll] = useState(false)
+  const INITIAL_REVIEWS_COUNT = 2
+  
+  const isOwnProfile = currentUserId === professionalId
+  const displayedReviews = showAll ? reviews : reviews.slice(0, INITIAL_REVIEWS_COUNT)
+  const hasMoreReviews = reviews.length > INITIAL_REVIEWS_COUNT
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Reviews ({reviews.length})</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {/* Review form - only visible if not viewing own profile */}
+        <ReviewForm 
+          professionalId={professionalId} 
+          onSubmit={onSubmitReview}
+          isVisible={!isOwnProfile}
+        />
+
+        {reviews.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">No reviews yet. Be the first to review!</p>
+        ) : (
+          <>
+            <div className="space-y-4">
+              {displayedReviews.map((review) => (
+                <div key={review.id} className="border-b pb-4 last:border-0">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-medium">{review.clientName}</p>
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star key={star} className={`h-4 w-4 ${star <= review.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
+                        ))}
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{review.comment}</p>
+                </div>
+              ))}
+            </div>
+            
+            {/* View More button */}
+            {hasMoreReviews && !showAll && (
+              <div className="mt-4 text-center">
+                <Button variant="outline" onClick={() => setShowAll(true)}>
+                  View More Reviews ({reviews.length - INITIAL_REVIEWS_COUNT} more)
+                </Button>
+              </div>
+            )}
+            
+            {/* Show Less button */}
+            {showAll && hasMoreReviews && (
+              <div className="mt-4 text-center">
+                <Button variant="outline" onClick={() => setShowAll(false)}>
+                  Show Less
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </CardContent>
     </Card>
   )
@@ -554,6 +802,7 @@ export default function App() {
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false)
   const [isAdminLoginDialogOpen, setIsAdminLoginDialogOpen] = useState(false)
+  const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false)
 
   // Admin state
   const [adminStats, setAdminStats] = useState(null)
@@ -596,6 +845,12 @@ export default function App() {
       console.error('Error fetching featured professionals:', error)
     }
   }
+
+  // Refresh data function - to be called after approvals
+  const refreshData = useCallback(() => {
+    fetchCategories()
+    fetchFeaturedProfessionals()
+  }, [])
 
   const handleSearch = useCallback(async (category = '', location = '', keyword = '', page = 1) => {
     setIsLoading(true)
@@ -757,6 +1012,56 @@ export default function App() {
     }
   }
 
+  const handleEditProfile = async (editForm) => {
+    if (!token || !user) return
+    
+    setIsLoading(true)
+    try {
+      const res = await fetch(`/api/professionals/${user.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fullName: editForm.fullName,
+          phone: editForm.phone,
+          subcategory: editForm.subcategory,
+          bio: editForm.bio,
+          experience: parseInt(editForm.experience),
+          location: {
+            country: editForm.country,
+            state: editForm.state,
+            city: editForm.city
+          },
+          serviceOptions: {
+            inPerson: editForm.inPerson,
+            virtual: editForm.virtual
+          },
+          languages: editForm.languages.split(',').map(l => l.trim()),
+          socialLinks: {
+            linkedin: editForm.linkedin,
+            twitter: editForm.twitter,
+            website: editForm.website
+          }
+        })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setUser(data.professional)
+        localStorage.setItem('expertbridge_user', JSON.stringify(data.professional))
+        setIsEditProfileDialogOpen(false)
+        toast.success('Profile updated successfully!')
+      } else {
+        toast.error(data.error || 'Failed to update profile')
+      }
+    } catch (error) {
+      toast.error('Failed to update profile')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleLogout = () => {
     setToken(null)
     setUser(null)
@@ -796,13 +1101,15 @@ export default function App() {
       if (res.ok) {
         toast.success('Professional approved!')
         fetchAdminData(token)
+        // Also refresh public data so categories and featured professionals update
+        refreshData()
       } else {
         toast.error('Failed to approve')
       }
     } catch (error) {
       toast.error('Failed to approve')
     }
-  }, [token, fetchAdminData])
+  }, [token, fetchAdminData, refreshData])
 
   const handleReject = useCallback(async (professionalId, reason) => {
     try {
@@ -1089,6 +1396,7 @@ export default function App() {
   const renderProfileView = () => {
     const professional = selectedProfessional?.professional
     const reviews = selectedProfessional?.reviews || []
+    const badge = professional ? getProfessionalBadge(professional) : null
 
     if (!professional) return null
 
@@ -1112,9 +1420,10 @@ export default function App() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h1 className="text-3xl font-bold">{professional.fullName}</h1>
-                      {professional.verification?.status === 'approved' && (
-                        <Badge className="bg-blue-500">
-                          <CheckCircle className="h-3 w-3 mr-1" /> Verified
+                      {badge && (
+                        <Badge className={badge.className}>
+                          <badge.icon className="h-3 w-3 mr-1" />
+                          {badge.label}
                         </Badge>
                       )}
                     </div>
@@ -1178,37 +1487,13 @@ export default function App() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Reviews ({reviews.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ReviewForm professionalId={professional.id} onSubmit={submitReview} />
-
-                {reviews.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">No reviews yet. Be the first to review!</p>
-                ) : (
-                  <div className="space-y-4">
-                    {reviews.map((review) => (
-                      <div key={review.id} className="border-b pb-4 last:border-0">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="font-medium">{review.clientName}</p>
-                            <div className="flex gap-0.5">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star key={star} className={`h-4 w-4 ${star <= review.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
-                              ))}
-                            </div>
-                          </div>
-                          <span className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{review.comment}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Reviews Section - hide review form if viewing own profile */}
+            <ReviewsSection
+              reviews={reviews}
+              professionalId={professional.id}
+              currentUserId={user?.id}
+              onSubmitReview={submitReview}
+            />
           </div>
 
           <div className="space-y-6">
@@ -1260,6 +1545,7 @@ export default function App() {
   // Render Dashboard View
   const renderDashboardView = () => {
     if (!user) return null
+    const badge = getProfessionalBadge(user)
 
     return (
       <div className="container py-8">
@@ -1321,13 +1607,19 @@ export default function App() {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span>Verification Status</span>
-                  <Badge variant={user.verification?.status === 'approved' ? 'default' : user.verification?.status === 'pending' ? 'secondary' : 'destructive'}>
-                    {user.verification?.status === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
-                    {user.verification?.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
-                    {user.verification?.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
-                    {user.verification?.status?.charAt(0).toUpperCase() + user.verification?.status?.slice(1)}
-                  </Badge>
+                  <span>Account Status</span>
+                  {badge ? (
+                    <Badge className={badge.className}>
+                      <badge.icon className="h-3 w-3 mr-1" />
+                      {badge.label}
+                    </Badge>
+                  ) : (
+                    <Badge variant={user.verification?.status === 'pending' ? 'secondary' : 'destructive'}>
+                      {user.verification?.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                      {user.verification?.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                      {user.verification?.status?.charAt(0).toUpperCase() + user.verification?.status?.slice(1)}
+                    </Badge>
+                  )}
                 </div>
                 {user.verification?.status === 'rejected' && user.verification?.rejectionReason && (
                   <div className="p-3 bg-destructive/10 rounded-lg text-sm text-destructive">
@@ -1346,6 +1638,11 @@ export default function App() {
                   <span>Location</span>
                   <span>{user.location?.city}, {user.location?.country}</span>
                 </div>
+                {user.verification?.status === 'approved' && !user.featured?.isFeatured && (
+                  <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700 mt-4">
+                    <strong>Upgrade to Verified:</strong> Subscribe to get the Verified badge and appear in the Featured Experts carousel.
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1356,11 +1653,11 @@ export default function App() {
               <Button className="w-full justify-start" variant="outline" onClick={() => viewProfessionalProfile(user.id)}>
                 <Eye className="h-4 w-4 mr-2" /> View Public Profile
               </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Settings className="h-4 w-4 mr-2" /> Edit Profile
+              <Button className="w-full justify-start" variant="outline" onClick={() => setIsEditProfileDialogOpen(true)}>
+                <Edit className="h-4 w-4 mr-2" /> Edit Profile
               </Button>
               <Button className="w-full justify-start" variant="outline">
-                <Award className="h-4 w-4 mr-2" /> Get Featured
+                <Award className="h-4 w-4 mr-2" /> Get Featured (Coming Soon)
               </Button>
             </CardContent>
           </Card>
@@ -1661,6 +1958,13 @@ export default function App() {
       <LoginDialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen} onLogin={handleLogin} isLoading={isLoading} />
       <AdminLoginDialog open={isAdminLoginDialogOpen} onOpenChange={setIsAdminLoginDialogOpen} onLogin={handleAdminLogin} isLoading={isLoading} />
       <RegisterDialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen} onRegister={handleRegister} isLoading={isLoading} />
+      <EditProfileDialog 
+        open={isEditProfileDialogOpen} 
+        onOpenChange={setIsEditProfileDialogOpen} 
+        user={user}
+        onSave={handleEditProfile}
+        isLoading={isLoading}
+      />
 
       <main className="flex-1">
         {currentView === 'home' && renderHomeView()}
