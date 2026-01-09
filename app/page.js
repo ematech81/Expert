@@ -1896,6 +1896,7 @@ export default function App() {
     if (!user) return null
     const badge = getProfessionalBadge(user)
     const hasActiveSubscription = user.subscription?.status === 'active' && new Date(user.subscription?.endDate) > new Date()
+    const isApproved = user.verification?.status === 'approved'
 
     return (
       <div className="container py-8">
@@ -1988,9 +1989,16 @@ export default function App() {
                   <span>Location</span>
                   <span>{user.location?.city}, {user.location?.country}</span>
                 </div>
-                {user.verification?.status === 'approved' && !hasActiveSubscription && (
+                {/* Show upgrade message only for approved users who are not yet subscribed */}
+                {isApproved && !hasActiveSubscription && (
                   <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700 mt-4">
                     <strong>Upgrade to Featured:</strong> Subscribe to get the Verified badge and appear in the Featured Experts carousel.
+                  </div>
+                )}
+                {/* Show pending message for non-approved users */}
+                {!isApproved && user.verification?.status === 'pending' && (
+                  <div className="p-3 bg-amber-50 rounded-lg text-sm text-amber-700 mt-4">
+                    <strong>Pending Approval:</strong> Your profile is being reviewed. Subscription options will be available once approved.
                   </div>
                 )}
                 {hasActiveSubscription && (
@@ -2011,14 +2019,26 @@ export default function App() {
               <Button className="w-full justify-start" variant="outline" onClick={() => setIsEditProfileDialogOpen(true)}>
                 <Edit className="h-4 w-4 mr-2" /> Edit Profile
               </Button>
-              <Button 
-                className="w-full justify-start" 
-                variant={hasActiveSubscription ? "outline" : "default"}
-                onClick={() => setIsSubscriptionDialogOpen(true)}
-              >
-                <Crown className="h-4 w-4 mr-2" /> 
-                {hasActiveSubscription ? 'View Subscription' : 'Get Featured'}
-              </Button>
+              {/* Only show subscription button for approved users */}
+              {isApproved ? (
+                <Button 
+                  className="w-full justify-start" 
+                  variant={hasActiveSubscription ? "outline" : "default"}
+                  onClick={() => setIsSubscriptionDialogOpen(true)}
+                >
+                  <Crown className="h-4 w-4 mr-2" /> 
+                  {hasActiveSubscription ? 'View Subscription' : 'Get Featured'}
+                </Button>
+              ) : (
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  disabled
+                >
+                  <Crown className="h-4 w-4 mr-2" /> 
+                  Get Featured (Requires Approval)
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
