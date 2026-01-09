@@ -1584,24 +1584,31 @@ export default function App() {
           </div>
           
           {/* Horizontally scrollable container with two rows */}
-          <div className="overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            <div className="flex flex-col gap-4" style={{ minWidth: 'max-content' }}>
-              {/* First Row - First 10 categories */}
-              <div className="flex gap-4">
-                {CATEGORIES.slice(0, 10).map((category) => {
+          <div 
+            className="overflow-x-scroll pb-4 -mx-4 px-4 cursor-grab active:cursor-grabbing"
+            style={{ 
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#cbd5e1 transparent'
+            }}
+          >
+            <div className="inline-flex flex-col gap-4">
+              {/* First Row - First 13 categories */}
+              <div className="flex gap-3">
+                {CATEGORIES.slice(0, 13).map((category) => {
                   const Icon = category.icon
                   const catData = categories.find(c => c.name === category.name)
                   return (
                     <Card 
                       key={category.name} 
-                      className="cursor-pointer hover:shadow-md transition-all hover:-translate-y-1 group flex-shrink-0 w-[160px]"
+                      className="cursor-pointer hover:shadow-md transition-all hover:-translate-y-1 group flex-shrink-0"
+                      style={{ width: '150px' }}
                       onClick={() => handleCategoryClick(category.name)}
                     >
-                      <CardContent className="p-4 text-center">
-                        <div className={`w-12 h-12 mx-auto mb-3 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                          <Icon className="h-6 w-6 text-white" />
+                      <CardContent className="p-3 text-center">
+                        <div className={`w-10 h-10 mx-auto mb-2 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                          <Icon className="h-5 w-5 text-white" />
                         </div>
-                        <h3 className="font-medium text-sm mb-1 truncate">{category.name}</h3>
+                        <h3 className="font-medium text-xs mb-1 truncate">{category.name}</h3>
                         <p className="text-xs text-muted-foreground">{catData?.count || 0} experts</p>
                       </CardContent>
                     </Card>
@@ -1609,22 +1616,23 @@ export default function App() {
                 })}
               </div>
               
-              {/* Second Row - Last 10 categories */}
-              <div className="flex gap-4">
-                {CATEGORIES.slice(10, 20).map((category) => {
+              {/* Second Row - Remaining categories */}
+              <div className="flex gap-3">
+                {CATEGORIES.slice(13).map((category) => {
                   const Icon = category.icon
                   const catData = categories.find(c => c.name === category.name)
                   return (
                     <Card 
                       key={category.name} 
-                      className="cursor-pointer hover:shadow-md transition-all hover:-translate-y-1 group flex-shrink-0 w-[160px]"
+                      className="cursor-pointer hover:shadow-md transition-all hover:-translate-y-1 group flex-shrink-0"
+                      style={{ width: '150px' }}
                       onClick={() => handleCategoryClick(category.name)}
                     >
-                      <CardContent className="p-4 text-center">
-                        <div className={`w-12 h-12 mx-auto mb-3 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                          <Icon className="h-6 w-6 text-white" />
+                      <CardContent className="p-3 text-center">
+                        <div className={`w-10 h-10 mx-auto mb-2 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                          <Icon className="h-5 w-5 text-white" />
                         </div>
-                        <h3 className="font-medium text-sm mb-1 truncate">{category.name}</h3>
+                        <h3 className="font-medium text-xs mb-1 truncate">{category.name}</h3>
                         <p className="text-xs text-muted-foreground">{catData?.count || 0} experts</p>
                       </CardContent>
                     </Card>
@@ -1637,7 +1645,7 @@ export default function App() {
           {/* Scroll indicator */}
           <div className="flex justify-center mt-4">
             <p className="text-sm text-muted-foreground flex items-center gap-2">
-              <ChevronRight className="h-4 w-4 animate-pulse" /> Scroll horizontally to see more categories
+              <ChevronRight className="h-4 w-4 animate-pulse" /> Scroll horizontally to see all {CATEGORIES.length} categories
             </p>
           </div>
         </div>
