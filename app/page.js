@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,8 +46,8 @@ const CATEGORIES = [
 
 const HERO_IMAGE = 'https://images.pexels.com/photos/7616608/pexels-photo-7616608.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
 
-// Professional Card Component (moved outside)
-function ProfessionalCard({ professional, onClick }) {
+// Professional Card Component
+const ProfessionalCard = memo(function ProfessionalCard({ professional, onClick }) {
   return (
     <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group" onClick={onClick}>
       <CardHeader className="pb-3">
@@ -98,9 +98,9 @@ function ProfessionalCard({ professional, onClick }) {
       </CardFooter>
     </Card>
   )
-}
+})
 
-// Login Dialog Component (moved outside)
+// Login Dialog Component
 function LoginDialog({ open, onOpenChange, onLogin, isLoading }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -148,7 +148,7 @@ function LoginDialog({ open, onOpenChange, onLogin, isLoading }) {
   )
 }
 
-// Admin Login Dialog Component (moved outside)
+// Admin Login Dialog Component
 function AdminLoginDialog({ open, onOpenChange, onLogin, isLoading }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -196,7 +196,7 @@ function AdminLoginDialog({ open, onOpenChange, onLogin, isLoading }) {
   )
 }
 
-// Registration Dialog Component (moved outside)
+// Registration Dialog Component
 function RegisterDialog({ open, onOpenChange, onRegister, isLoading }) {
   const [form, setForm] = useState({
     fullName: '', email: '', phone: '', password: '', confirmPassword: '',
@@ -320,15 +320,227 @@ function RegisterDialog({ open, onOpenChange, onRegister, isLoading }) {
   )
 }
 
+// Hero Search Component - separate to prevent re-renders
+function HeroSearch({ onSearch }) {
+  const [category, setCategory] = useState('')
+  const [location, setLocation] = useState('')
+
+  const handleSearch = () => {
+    onSearch(category, location)
+  }
+
+  return (
+    <Card className="p-2 bg-white/95 backdrop-blur">
+      <div className="flex flex-col md:flex-row gap-2">
+        <div className="flex-1">
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger className="border-0 bg-transparent">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {CATEGORIES.map(cat => (
+                <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex-1">
+          <Input 
+            placeholder="Location (city or country)" 
+            className="border-0 bg-transparent"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+        </div>
+        <Button size="lg" onClick={handleSearch} className="px-8">
+          <Search className="h-4 w-4 mr-2" />
+          Search
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
+// Search Filters Component
+function SearchFilters({ onSearch, initialCategory, initialLocation, initialKeyword }) {
+  const [category, setCategory] = useState(initialCategory || '')
+  const [location, setLocation] = useState(initialLocation || '')
+  const [keyword, setKeyword] = useState(initialKeyword || '')
+
+  const handleApply = () => {
+    onSearch(category, location, keyword)
+  }
+
+  const handleClear = () => {
+    setCategory('')
+    setLocation('')
+    setKeyword('')
+    onSearch('', '', '')
+  }
+
+  return (
+    <Card className="sticky top-24">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Filter className="h-4 w-4" /> Filters
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>Category</Label>
+          <Select value={category} onValueChange={setCategory}>
+            <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {CATEGORIES.map(cat => (
+                <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Location</Label>
+          <Input 
+            placeholder="City or country" 
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Keyword</Label>
+          <Input 
+            placeholder="Search by name or skill" 
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+          />
+        </div>
+        <Button className="w-full" onClick={handleApply}>
+          Apply Filters
+        </Button>
+        <Button variant="outline" className="w-full" onClick={handleClear}>
+          Clear Filters
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Admin Pending Card Component
+function AdminPendingCard({ professional, onApprove, onReject }) {
+  const [isApproving, setIsApproving] = useState(false)
+  const [isRejecting, setIsRejecting] = useState(false)
+
+  const handleApprove = async () => {
+    setIsApproving(true)
+    await onApprove(professional.id)
+    setIsApproving(false)
+  }
+
+  const handleReject = async () => {
+    setIsRejecting(true)
+    await onReject(professional.id, 'Does not meet verification requirements')
+    setIsRejecting(false)
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={professional.profilePhoto?.url} />
+              <AvatarFallback>{professional.fullName?.slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="font-semibold text-lg">{professional.fullName}</h3>
+              <p className="text-muted-foreground">{professional.category} • {professional.experience} years</p>
+              <p className="text-sm text-muted-foreground">{professional.location?.city}, {professional.location?.country}</p>
+              <p className="text-sm text-muted-foreground">{professional.email}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={handleApprove} disabled={isApproving}>
+              {isApproving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <CheckCircle className="h-4 w-4 mr-1" />}
+              Approve
+            </Button>
+            <Button size="sm" variant="destructive" onClick={handleReject} disabled={isRejecting}>
+              {isRejecting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <XCircle className="h-4 w-4 mr-1" />}
+              Reject
+            </Button>
+          </div>
+        </div>
+        <Separator className="my-4" />
+        <p className="text-sm line-clamp-3">{professional.bio}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Review Form Component
+function ReviewForm({ professionalId, onSubmit }) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [rating, setRating] = useState(5)
+  const [comment, setComment] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!name || !email || !comment) {
+      toast.error('Please fill in all fields')
+      return
+    }
+    setIsSubmitting(true)
+    await onSubmit({ clientName: name, clientEmail: email, rating, comment, professionalId })
+    setName('')
+    setEmail('')
+    setRating(5)
+    setComment('')
+    setIsSubmitting(false)
+  }
+
+  return (
+    <Card className="mb-6 border-dashed">
+      <CardContent className="pt-4 space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Your Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Your Email</Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Rating</Label>
+          <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button key={star} type="button" onClick={() => setRating(star)}>
+                <Star className={`h-6 w-6 ${star <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Your Review</Label>
+          <Textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Share your experience..." />
+        </div>
+        <Button onClick={handleSubmit} disabled={isSubmitting}>
+          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          Submit Review
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function App() {
   const [currentView, setCurrentView] = useState('home')
   const [user, setUser] = useState(null)
   const [userRole, setUserRole] = useState(null)
   const [token, setToken] = useState(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [searchCategory, setSearchCategory] = useState('')
-  const [searchLocation, setSearchLocation] = useState('')
-  const [searchKeyword, setSearchKeyword] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [selectedProfessional, setSelectedProfessional] = useState(null)
   const [categories, setCategories] = useState([])
@@ -336,6 +548,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0 })
   const [isInitialized, setIsInitialized] = useState(false)
+  const [currentSearchParams, setCurrentSearchParams] = useState({ category: '', location: '', keyword: '' })
 
   // Dialog states
   const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
@@ -350,7 +563,6 @@ export default function App() {
   useEffect(() => {
     if (isInitialized) return
     
-    // Check for stored token
     const storedToken = localStorage.getItem('expertbridge_token')
     const storedUser = localStorage.getItem('expertbridge_user')
     const storedRole = localStorage.getItem('expertbridge_role')
@@ -360,7 +572,6 @@ export default function App() {
       setUserRole(storedRole)
     }
     
-    // Fetch initial data
     fetchCategories()
     fetchFeaturedProfessionals()
     setIsInitialized(true)
@@ -388,6 +599,7 @@ export default function App() {
 
   const handleSearch = useCallback(async (category = '', location = '', keyword = '', page = 1) => {
     setIsLoading(true)
+    setCurrentSearchParams({ category, location, keyword })
     try {
       const queryParams = new URLSearchParams()
       if (category && category !== 'all') queryParams.append('category', category)
@@ -408,10 +620,9 @@ export default function App() {
     }
   }, [])
 
-  const handleCategoryClick = (categoryName) => {
-    setSearchCategory(categoryName)
-    handleSearch(categoryName, searchLocation, searchKeyword)
-  }
+  const handleCategoryClick = useCallback((categoryName) => {
+    handleSearch(categoryName, '', '')
+  }, [handleSearch])
 
   const handleLogin = async (email, password) => {
     if (!email || !password) {
@@ -557,7 +768,7 @@ export default function App() {
     toast.success('Logged out successfully')
   }
 
-  const fetchAdminData = async (authToken) => {
+  const fetchAdminData = useCallback(async (authToken) => {
     const headers = { 'Authorization': `Bearer ${authToken || token}` }
     try {
       const [statsRes, pendingRes, allRes] = await Promise.all([
@@ -574,9 +785,9 @@ export default function App() {
     } catch (error) {
       console.error('Error fetching admin data:', error)
     }
-  }
+  }, [token])
 
-  const handleApprove = async (professionalId) => {
+  const handleApprove = useCallback(async (professionalId) => {
     try {
       const res = await fetch(`/api/admin/approve/${professionalId}`, {
         method: 'PUT',
@@ -584,14 +795,16 @@ export default function App() {
       })
       if (res.ok) {
         toast.success('Professional approved!')
-        fetchAdminData()
+        fetchAdminData(token)
+      } else {
+        toast.error('Failed to approve')
       }
     } catch (error) {
       toast.error('Failed to approve')
     }
-  }
+  }, [token, fetchAdminData])
 
-  const handleReject = async (professionalId, reason) => {
+  const handleReject = useCallback(async (professionalId, reason) => {
     try {
       const res = await fetch(`/api/admin/reject/${professionalId}`, {
         method: 'PUT',
@@ -603,12 +816,14 @@ export default function App() {
       })
       if (res.ok) {
         toast.success('Professional rejected')
-        fetchAdminData()
+        fetchAdminData(token)
+      } else {
+        toast.error('Failed to reject')
       }
     } catch (error) {
       toast.error('Failed to reject')
     }
-  }
+  }, [token, fetchAdminData])
 
   const viewProfessionalProfile = async (professionalId) => {
     setIsLoading(true)
@@ -632,8 +847,26 @@ export default function App() {
     }
   }
 
-  // Home View
-  const HomeView = () => (
+  const submitReview = async (reviewData) => {
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reviewData)
+      })
+      if (res.ok) {
+        toast.success('Review submitted for approval')
+        return true
+      }
+      return false
+    } catch (error) {
+      toast.error('Failed to submit review')
+      return false
+    }
+  }
+
+  // Render Home View
+  const renderHomeView = () => (
     <div>
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
@@ -649,36 +882,7 @@ export default function App() {
                 ExpertBridge connects you with verified experts across 20+ categories — lawyers, psychologists, financial advisors, and more. Virtual or in-person, anywhere in the world.
               </p>
               
-              {/* Search Box */}
-              <Card className="p-2 bg-white/95 backdrop-blur">
-                <div className="flex flex-col md:flex-row gap-2">
-                  <div className="flex-1">
-                    <Select value={searchCategory} onValueChange={setSearchCategory}>
-                      <SelectTrigger className="border-0 bg-transparent">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {CATEGORIES.map(cat => (
-                          <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex-1">
-                    <Input 
-                      placeholder="Location (city or country)" 
-                      className="border-0 bg-transparent"
-                      value={searchLocation}
-                      onChange={(e) => setSearchLocation(e.target.value)}
-                    />
-                  </div>
-                  <Button size="lg" onClick={() => handleSearch(searchCategory, searchLocation, searchKeyword)} className="px-8">
-                    <Search className="h-4 w-4 mr-2" />
-                    Search
-                  </Button>
-                </div>
-              </Card>
+              <HeroSearch onSearch={handleSearch} />
 
               <div className="flex flex-wrap gap-4 mt-8 text-sm">
                 <span className="flex items-center gap-2"><CheckCircle className="h-4 w-4" /> Verified Professionals</span>
@@ -687,7 +891,6 @@ export default function App() {
               </div>
             </div>
             
-            {/* Hero Image */}
             <div className="hidden lg:block">
               <div className="relative">
                 <div className="absolute -inset-4 bg-white/10 rounded-3xl blur-2xl"></div>
@@ -818,55 +1021,19 @@ export default function App() {
     </div>
   )
 
-  // Search Results View
-  const SearchView = () => (
+  // Render Search View
+  const renderSearchView = () => (
     <div className="container py-8">
       <div className="flex flex-col lg:flex-row gap-8">
-        {/* Filters Sidebar */}
         <aside className="lg:w-64 flex-shrink-0">
-          <Card className="sticky top-24">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Filter className="h-4 w-4" /> Filters
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Select value={searchCategory} onValueChange={setSearchCategory}>
-                  <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {CATEGORIES.map(cat => (
-                      <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Location</Label>
-                <Input 
-                  placeholder="City or country" 
-                  value={searchLocation}
-                  onChange={(e) => setSearchLocation(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Keyword</Label>
-                <Input 
-                  placeholder="Search by name or skill" 
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                />
-              </div>
-              <Button className="w-full" onClick={() => handleSearch(searchCategory, searchLocation, searchKeyword)}>
-                Apply Filters
-              </Button>
-            </CardContent>
-          </Card>
+          <SearchFilters 
+            onSearch={handleSearch}
+            initialCategory={currentSearchParams.category}
+            initialLocation={currentSearchParams.location}
+            initialKeyword={currentSearchParams.keyword}
+          />
         </aside>
 
-        {/* Results */}
         <main className="flex-1">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -884,14 +1051,6 @@ export default function App() {
               <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="text-lg font-semibold mb-2">No professionals found</h3>
               <p className="text-muted-foreground mb-4">Try adjusting your filters or search criteria</p>
-              <Button variant="outline" onClick={() => {
-                setSearchCategory('')
-                setSearchLocation('')
-                setSearchKeyword('')
-                handleSearch('', '', '')
-              }}>
-                Clear Filters
-              </Button>
             </Card>
           ) : (
             <>
@@ -905,7 +1064,6 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Pagination */}
               {pagination.pages > 1 && (
                 <div className="flex justify-center gap-2 mt-8">
                   {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((page) => (
@@ -913,7 +1071,7 @@ export default function App() {
                       key={page} 
                       variant={page === pagination.page ? 'default' : 'outline'} 
                       size="sm"
-                      onClick={() => handleSearch(searchCategory, searchLocation, searchKeyword, page)}
+                      onClick={() => handleSearch(currentSearchParams.category, currentSearchParams.location, currentSearchParams.keyword, page)}
                     >
                       {page}
                     </Button>
@@ -927,45 +1085,10 @@ export default function App() {
     </div>
   )
 
-  // Professional Profile View
-  const ProfileView = () => {
+  // Render Profile View
+  const renderProfileView = () => {
     const professional = selectedProfessional?.professional
     const reviews = selectedProfessional?.reviews || []
-    const [showReviewForm, setShowReviewForm] = useState(false)
-    const [reviewName, setReviewName] = useState('')
-    const [reviewEmail, setReviewEmail] = useState('')
-    const [reviewRating, setReviewRating] = useState(5)
-    const [reviewComment, setReviewComment] = useState('')
-
-    const submitReview = async () => {
-      if (!reviewName || !reviewEmail || !reviewComment) {
-        toast.error('Please fill in all fields')
-        return
-      }
-      try {
-        const res = await fetch('/api/reviews', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            professionalId: professional.id,
-            clientName: reviewName,
-            clientEmail: reviewEmail,
-            rating: reviewRating,
-            comment: reviewComment
-          })
-        })
-        if (res.ok) {
-          toast.success('Review submitted for approval')
-          setShowReviewForm(false)
-          setReviewName('')
-          setReviewEmail('')
-          setReviewRating(5)
-          setReviewComment('')
-        }
-      } catch (error) {
-        toast.error('Failed to submit review')
-      }
-    }
 
     if (!professional) return null
 
@@ -976,7 +1099,6 @@ export default function App() {
         </Button>
 
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Profile */}
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardContent className="pt-6">
@@ -1021,21 +1143,15 @@ export default function App() {
               </CardContent>
             </Card>
 
-            {/* About */}
             <Card>
-              <CardHeader>
-                <CardTitle>About</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>About</CardTitle></CardHeader>
               <CardContent>
                 <p className="whitespace-pre-wrap">{professional.bio}</p>
               </CardContent>
             </Card>
 
-            {/* Services */}
             <Card>
-              <CardHeader>
-                <CardTitle>Services Offered</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>Services Offered</CardTitle></CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-3">
                   {professional.serviceOptions?.virtual && (
@@ -1062,46 +1178,12 @@ export default function App() {
               </CardContent>
             </Card>
 
-            {/* Reviews */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Reviews ({reviews.length})</CardTitle>
-                <Button size="sm" onClick={() => setShowReviewForm(!showReviewForm)}>
-                  Write a Review
-                </Button>
               </CardHeader>
               <CardContent>
-                {showReviewForm && (
-                  <Card className="mb-6 border-dashed">
-                    <CardContent className="pt-4 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Your Name</Label>
-                          <Input value={reviewName} onChange={(e) => setReviewName(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Your Email</Label>
-                          <Input type="email" value={reviewEmail} onChange={(e) => setReviewEmail(e.target.value)} />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Rating</Label>
-                        <div className="flex gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button key={star} onClick={() => setReviewRating(star)}>
-                              <Star className={`h-6 w-6 ${star <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Your Review</Label>
-                        <Textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder="Share your experience..." />
-                      </div>
-                      <Button onClick={submitReview}>Submit Review</Button>
-                    </CardContent>
-                  </Card>
-                )}
+                <ReviewForm professionalId={professional.id} onSubmit={submitReview} />
 
                 {reviews.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">No reviews yet. Be the first to review!</p>
@@ -1129,7 +1211,6 @@ export default function App() {
             </Card>
           </div>
 
-          {/* Sidebar - Contact */}
           <div className="space-y-6">
             <Card className="sticky top-24">
               <CardHeader>
@@ -1176,8 +1257,8 @@ export default function App() {
     )
   }
 
-  // Professional Dashboard View
-  const DashboardView = () => {
+  // Render Dashboard View
+  const renderDashboardView = () => {
     if (!user) return null
 
     return (
@@ -1191,9 +1272,7 @@ export default function App() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-blue-100">
-                  <Eye className="h-6 w-6 text-blue-600" />
-                </div>
+                <div className="p-3 rounded-full bg-blue-100"><Eye className="h-6 w-6 text-blue-600" /></div>
                 <div>
                   <p className="text-2xl font-bold">{user.analytics?.profileViews || 0}</p>
                   <p className="text-sm text-muted-foreground">Profile Views</p>
@@ -1204,9 +1283,7 @@ export default function App() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-green-100">
-                  <MousePointer className="h-6 w-6 text-green-600" />
-                </div>
+                <div className="p-3 rounded-full bg-green-100"><MousePointer className="h-6 w-6 text-green-600" /></div>
                 <div>
                   <p className="text-2xl font-bold">{user.analytics?.contactClicks || 0}</p>
                   <p className="text-sm text-muted-foreground">Contact Clicks</p>
@@ -1217,9 +1294,7 @@ export default function App() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-amber-100">
-                  <Star className="h-6 w-6 text-amber-600" />
-                </div>
+                <div className="p-3 rounded-full bg-amber-100"><Star className="h-6 w-6 text-amber-600" /></div>
                 <div>
                   <p className="text-2xl font-bold">{user.ratings?.average || 0}</p>
                   <p className="text-sm text-muted-foreground">Average Rating</p>
@@ -1230,9 +1305,7 @@ export default function App() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-purple-100">
-                  <Award className="h-6 w-6 text-purple-600" />
-                </div>
+                <div className="p-3 rounded-full bg-purple-100"><Award className="h-6 w-6 text-purple-600" /></div>
                 <div>
                   <p className="text-2xl font-bold">{user.ratings?.count || 0}</p>
                   <p className="text-sm text-muted-foreground">Total Reviews</p>
@@ -1243,11 +1316,8 @@ export default function App() {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* Profile Status */}
           <Card>
-            <CardHeader>
-              <CardTitle>Profile Status</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Profile Status</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1280,11 +1350,8 @@ export default function App() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
           <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <Button className="w-full justify-start" variant="outline" onClick={() => viewProfessionalProfile(user.id)}>
                 <Eye className="h-4 w-4 mr-2" /> View Public Profile
@@ -1302,14 +1369,8 @@ export default function App() {
     )
   }
 
-  // Admin Dashboard View
-  const AdminView = () => {
-    useEffect(() => {
-      if (userRole === 'admin' && token) {
-        fetchAdminData()
-      }
-    }, [])
-
+  // Render Admin View
+  const renderAdminView = () => {
     if (!user || userRole !== 'admin') return null
 
     return (
@@ -1319,7 +1380,6 @@ export default function App() {
           <p className="text-muted-foreground">Manage professionals and platform settings</p>
         </div>
 
-        {/* Stats */}
         {adminStats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <Card>
@@ -1365,34 +1425,12 @@ export default function App() {
             ) : (
               <div className="space-y-4">
                 {pendingProfessionals.map((professional) => (
-                  <Card key={professional.id}>
-                    <CardContent className="pt-6">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <Avatar className="h-16 w-16">
-                            <AvatarImage src={professional.profilePhoto?.url} />
-                            <AvatarFallback>{professional.fullName?.slice(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h3 className="font-semibold text-lg">{professional.fullName}</h3>
-                            <p className="text-muted-foreground">{professional.category} • {professional.experience} years</p>
-                            <p className="text-sm text-muted-foreground">{professional.location?.city}, {professional.location?.country}</p>
-                            <p className="text-sm text-muted-foreground">{professional.email}</p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={() => handleApprove(professional.id)}>
-                            <CheckCircle className="h-4 w-4 mr-1" /> Approve
-                          </Button>
-                          <Button size="sm" variant="destructive" onClick={() => handleReject(professional.id, 'Does not meet verification requirements')}>
-                            <XCircle className="h-4 w-4 mr-1" /> Reject
-                          </Button>
-                        </div>
-                      </div>
-                      <Separator className="my-4" />
-                      <p className="text-sm line-clamp-3">{professional.bio}</p>
-                    </CardContent>
-                  </Card>
+                  <AdminPendingCard 
+                    key={professional.id} 
+                    professional={professional} 
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                  />
                 ))}
               </div>
             )}
@@ -1450,8 +1488,8 @@ export default function App() {
     )
   }
 
-  // About View
-  const AboutView = () => (
+  // Render About View
+  const renderAboutView = () => (
     <div className="container py-16">
       <div className="max-w-3xl mx-auto text-center mb-12">
         <h1 className="text-4xl font-bold mb-4">About ExpertBridge</h1>
@@ -1474,7 +1512,7 @@ export default function App() {
         </div>
         <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl p-8">
           <img 
-            src="https://images.unsplash.com/photo-1580983558189-84200466afb8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwzfHxidXNpbmVzcyUyMHRlYW18ZW58MHx8fGJsdWV8MTc2NzkwNzYxM3ww&ixlib=rb-4.1.0&q=85&w=600" 
+            src="https://images.unsplash.com/photo-1580983558189-84200466afb8?crop=entropy&cs=srgb&fm=jpg&w=600" 
             alt="Professional team" 
             className="rounded-xl shadow-lg"
           />
@@ -1513,8 +1551,8 @@ export default function App() {
     </div>
   )
 
-  // Footer Component
-  const Footer = () => (
+  // Footer
+  const renderFooter = () => (
     <footer className="border-t bg-muted/40">
       <div className="container py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -1567,7 +1605,6 @@ export default function App() {
     </footer>
   )
 
-  // Main render
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
@@ -1581,15 +1618,9 @@ export default function App() {
           </div>
 
           <nav className="hidden md:flex items-center gap-6">
-            <button onClick={() => setCurrentView('home')} className="text-sm font-medium hover:text-primary transition-colors">
-              Home
-            </button>
-            <button onClick={() => handleSearch('', '', '')} className="text-sm font-medium hover:text-primary transition-colors">
-              Find Experts
-            </button>
-            <button onClick={() => setCurrentView('about')} className="text-sm font-medium hover:text-primary transition-colors">
-              About
-            </button>
+            <button onClick={() => setCurrentView('home')} className="text-sm font-medium hover:text-primary transition-colors">Home</button>
+            <button onClick={() => handleSearch('', '', '')} className="text-sm font-medium hover:text-primary transition-colors">Find Experts</button>
+            <button onClick={() => setCurrentView('about')} className="text-sm font-medium hover:text-primary transition-colors">About</button>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -1617,7 +1648,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile menu */}
         {isMenuOpen && (
           <div className="md:hidden border-t p-4 space-y-2">
             <button onClick={() => { setCurrentView('home'); setIsMenuOpen(false); }} className="block w-full text-left py-2">Home</button>
@@ -1628,34 +1658,20 @@ export default function App() {
       </header>
 
       {/* Dialogs */}
-      <LoginDialog 
-        open={isLoginDialogOpen} 
-        onOpenChange={setIsLoginDialogOpen} 
-        onLogin={handleLogin} 
-        isLoading={isLoading} 
-      />
-      <AdminLoginDialog 
-        open={isAdminLoginDialogOpen} 
-        onOpenChange={setIsAdminLoginDialogOpen} 
-        onLogin={handleAdminLogin} 
-        isLoading={isLoading} 
-      />
-      <RegisterDialog 
-        open={isRegisterDialogOpen} 
-        onOpenChange={setIsRegisterDialogOpen} 
-        onRegister={handleRegister} 
-        isLoading={isLoading} 
-      />
+      <LoginDialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen} onLogin={handleLogin} isLoading={isLoading} />
+      <AdminLoginDialog open={isAdminLoginDialogOpen} onOpenChange={setIsAdminLoginDialogOpen} onLogin={handleAdminLogin} isLoading={isLoading} />
+      <RegisterDialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen} onRegister={handleRegister} isLoading={isLoading} />
 
       <main className="flex-1">
-        {currentView === 'home' && <HomeView />}
-        {currentView === 'search' && <SearchView />}
-        {currentView === 'profile' && <ProfileView />}
-        {currentView === 'dashboard' && <DashboardView />}
-        {currentView === 'admin' && <AdminView />}
-        {currentView === 'about' && <AboutView />}
+        {currentView === 'home' && renderHomeView()}
+        {currentView === 'search' && renderSearchView()}
+        {currentView === 'profile' && renderProfileView()}
+        {currentView === 'dashboard' && renderDashboardView()}
+        {currentView === 'admin' && renderAdminView()}
+        {currentView === 'about' && renderAboutView()}
       </main>
-      <Footer />
+      
+      {renderFooter()}
     </div>
   )
 }
