@@ -47,6 +47,7 @@ const CATEGORIES = [
 ]
 
 const HERO_IMAGE = 'https://images.pexels.com/photos/7616608/pexels-photo-7616608.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
+const HERO_BG_IMAGE = 'https://customer-assets.emergentagent.com/job_expertfinder-22/artifacts/dqjfwgeo_heroSection-2.svg'
 
 // Subscription Plans
 const SUBSCRIPTION_PLANS = {
