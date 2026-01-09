@@ -1525,72 +1525,115 @@ export default function App() {
   // Render Home View
   const renderHomeView = () => (
     <div>
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="container relative py-16 md:py-24">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/30">🌍 Connecting professionals globally</Badge>
-              <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
-                Find Verified <span className="text-blue-200">Professionals</span> You Can Trust
-              </h1>
-              <p className="text-lg text-blue-100 mb-8 max-w-xl">
-                ExpertBridge connects you with verified experts across 20+ categories — lawyers, psychologists, financial advisors, and more. Virtual or in-person, anywhere in the world.
-              </p>
-              
-              <HeroSearch onSearch={handleSearch} />
-
-              <div className="flex flex-wrap gap-4 mt-8 text-sm">
-                <span className="flex items-center gap-2"><CheckCircle className="h-4 w-4" /> Verified Professionals</span>
-                <span className="flex items-center gap-2"><Shield className="h-4 w-4" /> Secure Platform</span>
-                <span className="flex items-center gap-2"><Globe className="h-4 w-4" /> Global Network</span>
-              </div>
-            </div>
+      {/* Hero Section - Using heroSection-2.svg as background */}
+      <section 
+        className="relative overflow-hidden min-h-[600px] md:min-h-[700px]"
+        style={{
+          backgroundImage: `url('${HERO_BG_IMAGE}')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        {/* Content container - positioned on the left side following heroSection-1 layout */}
+        <div className="container relative py-16 md:py-24 lg:py-32">
+          <div className="max-w-2xl">
+            <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/30 backdrop-blur-sm">
+              🌍 Connecting professionals globally
+            </Badge>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight text-white">
+              Find Verified <span className="text-blue-200">Professionals</span> You Can Trust
+            </h1>
+            <p className="text-lg md:text-xl text-blue-100 mb-8 max-w-xl">
+              ExpertBridge connects you with verified experts across 20+ categories — lawyers, psychologists, financial advisors, and more. Virtual or in-person, anywhere in the world.
+            </p>
             
-            <div className="hidden lg:block">
-              <div className="relative">
-                <div className="absolute -inset-4 bg-white/10 rounded-3xl blur-2xl"></div>
-                <img 
-                  src={HERO_IMAGE} 
-                  alt="Professional consultation" 
-                  className="relative rounded-2xl shadow-2xl w-full h-[400px] object-cover object-center"
-                />
-              </div>
+            {/* Search Box */}
+            <div className="mb-8">
+              <HeroSearch onSearch={handleSearch} />
+            </div>
+
+            <div className="flex flex-wrap gap-4 text-sm text-white/90">
+              <span className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-2 rounded-full">
+                <CheckCircle className="h-4 w-4" /> Verified Professionals
+              </span>
+              <span className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-2 rounded-full">
+                <Shield className="h-4 w-4" /> Secure Platform
+              </span>
+              <span className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-3 py-2 rounded-full">
+                <Globe className="h-4 w-4" /> Global Network
+              </span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Categories Section */}
-      <section className="py-16 bg-muted/30">
+      {/* Categories Section - Horizontally Scrollable Two Rows */}
+      <section className="py-12 bg-muted/30">
         <div className="container">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <h2 className="text-3xl font-bold mb-4">Browse by Category</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Find the right professional for your needs from our diverse range of expert categories
             </p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {CATEGORIES.map((category) => {
-              const Icon = category.icon
-              const catData = categories.find(c => c.name === category.name)
-              return (
-                <Card 
-                  key={category.name} 
-                  className="cursor-pointer hover:shadow-md transition-all hover:-translate-y-1 group"
-                  onClick={() => handleCategoryClick(category.name)}
-                >
-                  <CardContent className="p-4 text-center">
-                    <div className={`w-12 h-12 mx-auto mb-3 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                      <Icon className="h-6 w-6 text-white" />
-                    </div>
-                    <h3 className="font-medium text-sm mb-1">{category.name}</h3>
-                    <p className="text-xs text-muted-foreground">{catData?.count || 0} experts</p>
-                  </CardContent>
-                </Card>
-              )
-            })}
+          
+          {/* Horizontally scrollable container with two rows */}
+          <div className="overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div className="flex flex-col gap-4" style={{ minWidth: 'max-content' }}>
+              {/* First Row - First 10 categories */}
+              <div className="flex gap-4">
+                {CATEGORIES.slice(0, 10).map((category) => {
+                  const Icon = category.icon
+                  const catData = categories.find(c => c.name === category.name)
+                  return (
+                    <Card 
+                      key={category.name} 
+                      className="cursor-pointer hover:shadow-md transition-all hover:-translate-y-1 group flex-shrink-0 w-[160px]"
+                      onClick={() => handleCategoryClick(category.name)}
+                    >
+                      <CardContent className="p-4 text-center">
+                        <div className={`w-12 h-12 mx-auto mb-3 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                          <Icon className="h-6 w-6 text-white" />
+                        </div>
+                        <h3 className="font-medium text-sm mb-1 truncate">{category.name}</h3>
+                        <p className="text-xs text-muted-foreground">{catData?.count || 0} experts</p>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+              
+              {/* Second Row - Last 10 categories */}
+              <div className="flex gap-4">
+                {CATEGORIES.slice(10, 20).map((category) => {
+                  const Icon = category.icon
+                  const catData = categories.find(c => c.name === category.name)
+                  return (
+                    <Card 
+                      key={category.name} 
+                      className="cursor-pointer hover:shadow-md transition-all hover:-translate-y-1 group flex-shrink-0 w-[160px]"
+                      onClick={() => handleCategoryClick(category.name)}
+                    >
+                      <CardContent className="p-4 text-center">
+                        <div className={`w-12 h-12 mx-auto mb-3 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                          <Icon className="h-6 w-6 text-white" />
+                        </div>
+                        <h3 className="font-medium text-sm mb-1 truncate">{category.name}</h3>
+                        <p className="text-xs text-muted-foreground">{catData?.count || 0} experts</p>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+          
+          {/* Scroll indicator */}
+          <div className="flex justify-center mt-4">
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <ChevronRight className="h-4 w-4 animate-pulse" /> Scroll horizontally to see more categories
+            </p>
           </div>
         </div>
       </section>
