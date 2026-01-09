@@ -50,7 +50,8 @@ const CATEGORIES = [
   'Accountant', 'Architect', 'Marriage Counselor', 'Tax Consultant',
   'Real Estate Agent', 'IT Consultant', 'Marketing Consultant',
   'HR Consultant', 'Life Coach', 'Immigration Consultant',
-  'Event Planner', 'Interior Designer', 'Education Consultant'
+  'Event Planner', 'Interior Designer', 'Education Consultant',
+  'Web Developer', 'Graphics Designer', 'Teacher', 'Housing Agent', 'Caterer'
 ]
 
 async function connectToMongo() {
