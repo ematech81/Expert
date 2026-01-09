@@ -1507,7 +1507,11 @@ export default function App() {
         body: JSON.stringify(reviewData)
       })
       if (res.ok) {
-        toast.success('Review submitted for approval')
+        toast.success('Review submitted successfully!')
+        // Refresh the profile to show the new review
+        if (selectedProfessional?.professional?.id) {
+          viewProfessionalProfile(selectedProfessional.professional.id)
+        }
         return true
       }
       return false
