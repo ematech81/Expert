@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,15 +8,14 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { 
-  Search, MapPin, Star, Phone, Mail, Globe, Linkedin, Twitter, Instagram,
+  Search, MapPin, Star, Phone, Mail, Globe, Linkedin, Twitter,
   Users, Award, CheckCircle, Clock, Filter, ChevronRight, Menu, X, LogOut,
   Building, Briefcase, Heart, Shield, TrendingUp, Eye, MousePointer,
   User, Settings, BarChart3, FileCheck, XCircle, Loader2
@@ -47,29 +46,159 @@ const CATEGORIES = [
 
 const HERO_IMAGE = 'https://images.pexels.com/photos/7616608/pexels-photo-7616608.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
 
-export default function App() {
-  const [currentView, setCurrentView] = useState('home')
-  const [user, setUser] = useState(null)
-  const [userRole, setUserRole] = useState(null)
-  const [token, setToken] = useState(null)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [searchParams, setSearchParams] = useState({ category: '', keyword: '', country: '' })
-  const [searchResults, setSearchResults] = useState([])
-  const [selectedProfessional, setSelectedProfessional] = useState(null)
-  const [categories, setCategories] = useState([])
-  const [featuredProfessionals, setFeaturedProfessionals] = useState([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0 })
+// Professional Card Component (moved outside)
+function ProfessionalCard({ professional, onClick }) {
+  return (
+    <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group" onClick={onClick}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-4">
+          <Avatar className="h-16 w-16 border-2 border-primary/10">
+            <AvatarImage src={professional.profilePhoto?.url} alt={professional.fullName} />
+            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+              {professional.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg truncate">{professional.fullName}</CardTitle>
+              {professional.verification?.status === 'approved' && (
+                <CheckCircle className="h-4 w-4 text-blue-500 flex-shrink-0" />
+              )}
+            </div>
+            <CardDescription className="flex items-center gap-1">
+              <Badge variant="secondary" className="font-normal">{professional.category}</Badge>
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-3">
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{professional.bio}</p>
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            {professional.location?.city}, {professional.location?.country}
+          </span>
+          <span className="flex items-center gap-1">
+            <Briefcase className="h-3 w-3" />
+            {professional.experience} years
+          </span>
+          {professional.ratings?.count > 0 && (
+            <span className="flex items-center gap-1">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              {professional.ratings.average} ({professional.ratings.count})
+            </span>
+          )}
+        </div>
+      </CardContent>
+      <CardFooter className="pt-0">
+        <div className="flex gap-2">
+          {professional.serviceOptions?.virtual && <Badge variant="outline" className="text-xs">Virtual</Badge>}
+          {professional.serviceOptions?.inPerson && <Badge variant="outline" className="text-xs">In-Person</Badge>}
+        </div>
+      </CardFooter>
+    </Card>
+  )
+}
 
-  // Auth state
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
-  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
-  const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false)
-  const [isAdminLoginDialogOpen, setIsAdminLoginDialogOpen] = useState(false)
+// Login Dialog Component (moved outside)
+function LoginDialog({ open, onOpenChange, onLogin, isLoading }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
-  // Registration form state
-  const [regForm, setRegForm] = useState({
+  const handleSubmit = () => {
+    onLogin(email, password)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Professional Login</DialogTitle>
+          <DialogDescription>Sign in to your ExpertBridge account</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="login-email">Email</Label>
+            <Input 
+              id="login-email" 
+              type="email" 
+              placeholder="you@example.com" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="login-password">Password</Label>
+            <Input 
+              id="login-password" 
+              type="password" 
+              placeholder="••••••••" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Admin Login Dialog Component (moved outside)
+function AdminLoginDialog({ open, onOpenChange, onLogin, isLoading }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  const handleSubmit = () => {
+    onLogin(email, password)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Admin Login</DialogTitle>
+          <DialogDescription>Sign in to the admin dashboard</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="admin-email">Email</Label>
+            <Input 
+              id="admin-email" 
+              type="email" 
+              placeholder="admin@expertbridge.com" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="admin-password">Password</Label>
+            <Input 
+              id="admin-password" 
+              type="password" 
+              placeholder="••••••••" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Registration Dialog Component (moved outside)
+function RegisterDialog({ open, onOpenChange, onRegister, isLoading }) {
+  const [form, setForm] = useState({
     fullName: '', email: '', phone: '', password: '', confirmPassword: '',
     category: '', subcategory: '', bio: '', experience: '',
     country: '', state: '', city: '',
@@ -77,12 +206,150 @@ export default function App() {
     languages: 'English', linkedin: '', twitter: '', website: ''
   })
 
+  const handleSubmit = () => {
+    onRegister(form)
+  }
+
+  const updateForm = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Join ExpertBridge</DialogTitle>
+          <DialogDescription>Create your professional profile and connect with clients globally</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="reg-name">Full Name *</Label>
+              <Input id="reg-name" placeholder="John Doe" value={form.fullName} onChange={(e) => updateForm('fullName', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-email">Email *</Label>
+              <Input id="reg-email" type="email" placeholder="you@example.com" value={form.email} onChange={(e) => updateForm('email', e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="reg-phone">Phone</Label>
+              <Input id="reg-phone" placeholder="+1234567890" value={form.phone} onChange={(e) => updateForm('phone', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-category">Category *</Label>
+              <Select value={form.category} onValueChange={(value) => updateForm('category', value)}>
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map(cat => (
+                    <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="reg-subcategory">Specialization</Label>
+              <Input id="reg-subcategory" placeholder="e.g., Corporate Lawyer" value={form.subcategory} onChange={(e) => updateForm('subcategory', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-experience">Years of Experience *</Label>
+              <Input id="reg-experience" type="number" min="0" placeholder="5" value={form.experience} onChange={(e) => updateForm('experience', e.target.value)} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="reg-bio">Professional Bio * (min 100 chars)</Label>
+            <Textarea id="reg-bio" placeholder="Describe your expertise, qualifications, and what makes you unique..." className="min-h-[100px]" value={form.bio} onChange={(e) => updateForm('bio', e.target.value)} />
+            <p className="text-xs text-muted-foreground">{form.bio.length}/100 characters minimum</p>
+          </div>
+          <Separator />
+          <h4 className="font-medium">Location</h4>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="reg-country">Country *</Label>
+              <Input id="reg-country" placeholder="Nigeria" value={form.country} onChange={(e) => updateForm('country', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-state">State/Region *</Label>
+              <Input id="reg-state" placeholder="Lagos" value={form.state} onChange={(e) => updateForm('state', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-city">City *</Label>
+              <Input id="reg-city" placeholder="Lagos" value={form.city} onChange={(e) => updateForm('city', e.target.value)} />
+            </div>
+          </div>
+          <Separator />
+          <h4 className="font-medium">Service Options</h4>
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox id="reg-virtual" checked={form.virtual} onCheckedChange={(checked) => updateForm('virtual', checked)} />
+              <Label htmlFor="reg-virtual">Virtual consultations</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox id="reg-inperson" checked={form.inPerson} onCheckedChange={(checked) => updateForm('inPerson', checked)} />
+              <Label htmlFor="reg-inperson">In-person meetings</Label>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="reg-languages">Languages (comma-separated)</Label>
+            <Input id="reg-languages" placeholder="English, French, Yoruba" value={form.languages} onChange={(e) => updateForm('languages', e.target.value)} />
+          </div>
+          <Separator />
+          <h4 className="font-medium">Password</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="reg-password">Password *</Label>
+              <Input id="reg-password" type="password" placeholder="••••••••" value={form.password} onChange={(e) => updateForm('password', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reg-confirm">Confirm Password *</Label>
+              <Input id="reg-confirm" type="password" placeholder="••••••••" value={form.confirmPassword} onChange={(e) => updateForm('confirmPassword', e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={handleSubmit} disabled={isLoading} className="w-full">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Create Profile
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+export default function App() {
+  const [currentView, setCurrentView] = useState('home')
+  const [user, setUser] = useState(null)
+  const [userRole, setUserRole] = useState(null)
+  const [token, setToken] = useState(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [searchCategory, setSearchCategory] = useState('')
+  const [searchLocation, setSearchLocation] = useState('')
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [searchResults, setSearchResults] = useState([])
+  const [selectedProfessional, setSelectedProfessional] = useState(null)
+  const [categories, setCategories] = useState([])
+  const [featuredProfessionals, setFeaturedProfessionals] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0 })
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // Dialog states
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false)
+  const [isAdminLoginDialogOpen, setIsAdminLoginDialogOpen] = useState(false)
+
   // Admin state
   const [adminStats, setAdminStats] = useState(null)
   const [pendingProfessionals, setPendingProfessionals] = useState([])
   const [allProfessionals, setAllProfessionals] = useState([])
 
   useEffect(() => {
+    if (isInitialized) return
+    
     // Check for stored token
     const storedToken = localStorage.getItem('expertbridge_token')
     const storedUser = localStorage.getItem('expertbridge_user')
@@ -92,9 +359,12 @@ export default function App() {
       setUser(JSON.parse(storedUser))
       setUserRole(storedRole)
     }
+    
+    // Fetch initial data
     fetchCategories()
     fetchFeaturedProfessionals()
-  }, [])
+    setIsInitialized(true)
+  }, [isInitialized])
 
   const fetchCategories = async () => {
     try {
@@ -116,13 +386,13 @@ export default function App() {
     }
   }
 
-  const handleSearch = async (params = searchParams, page = 1) => {
+  const handleSearch = useCallback(async (category = '', location = '', keyword = '', page = 1) => {
     setIsLoading(true)
     try {
       const queryParams = new URLSearchParams()
-      if (params.category) queryParams.append('category', params.category)
-      if (params.keyword) queryParams.append('keyword', params.keyword)
-      if (params.country) queryParams.append('country', params.country)
+      if (category && category !== 'all') queryParams.append('category', category)
+      if (keyword) queryParams.append('keyword', keyword)
+      if (location) queryParams.append('country', location)
       queryParams.append('page', page.toString())
       queryParams.append('limit', '12')
 
@@ -136,16 +406,15 @@ export default function App() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
   const handleCategoryClick = (categoryName) => {
-    const newParams = { ...searchParams, category: categoryName }
-    setSearchParams(newParams)
-    handleSearch(newParams)
+    setSearchCategory(categoryName)
+    handleSearch(categoryName, searchLocation, searchKeyword)
   }
 
-  const handleLogin = async () => {
-    if (!loginEmail || !loginPassword) {
+  const handleLogin = async (email, password) => {
+    if (!email || !password) {
       toast.error('Please fill in all fields')
       return
     }
@@ -154,7 +423,7 @@ export default function App() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+        body: JSON.stringify({ email, password })
       })
       const data = await res.json()
       if (res.ok) {
@@ -165,8 +434,6 @@ export default function App() {
         localStorage.setItem('expertbridge_user', JSON.stringify(data.professional))
         localStorage.setItem('expertbridge_role', 'professional')
         setIsLoginDialogOpen(false)
-        setLoginEmail('')
-        setLoginPassword('')
         toast.success('Login successful!')
         setCurrentView('dashboard')
       } else {
@@ -179,8 +446,8 @@ export default function App() {
     }
   }
 
-  const handleAdminLogin = async () => {
-    if (!loginEmail || !loginPassword) {
+  const handleAdminLogin = async (email, password) => {
+    if (!email || !password) {
       toast.error('Please fill in all fields')
       return
     }
@@ -189,7 +456,7 @@ export default function App() {
       const res = await fetch('/api/auth/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+        body: JSON.stringify({ email, password })
       })
       const data = await res.json()
       if (res.ok) {
@@ -200,8 +467,6 @@ export default function App() {
         localStorage.setItem('expertbridge_user', JSON.stringify(data.admin))
         localStorage.setItem('expertbridge_role', 'admin')
         setIsAdminLoginDialogOpen(false)
-        setLoginEmail('')
-        setLoginPassword('')
         toast.success('Admin login successful!')
         setCurrentView('admin')
         fetchAdminData(data.token)
@@ -215,7 +480,7 @@ export default function App() {
     }
   }
 
-  const handleRegister = async () => {
+  const handleRegister = async (regForm) => {
     if (regForm.password !== regForm.confirmPassword) {
       toast.error('Passwords do not match')
       return
@@ -367,379 +632,71 @@ export default function App() {
     }
   }
 
-  // Header Component
-  const Header = () => (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('home')}>
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">EB</span>
-          </div>
-          <span className="font-bold text-xl hidden sm:block">ExpertBridge</span>
-        </div>
-
-        <nav className="hidden md:flex items-center gap-6">
-          <button onClick={() => setCurrentView('home')} className="text-sm font-medium hover:text-primary transition-colors">
-            Home
-          </button>
-          <button onClick={() => handleSearch({ category: '', keyword: '', country: '' })} className="text-sm font-medium hover:text-primary transition-colors">
-            Find Experts
-          </button>
-          <button onClick={() => setCurrentView('about')} className="text-sm font-medium hover:text-primary transition-colors">
-            About
-          </button>
-        </nav>
-
-        <div className="flex items-center gap-3">
-          {user ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => setCurrentView(userRole === 'admin' ? 'admin' : 'dashboard')}>
-                <User className="h-4 w-4 mr-2" />
-                {user.fullName?.split(' ')[0] || 'Dashboard'}
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            <>
-              <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm">Login</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Professional Login</DialogTitle>
-                    <DialogDescription>Sign in to your ExpertBridge account</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="login-email">Email</Label>
-                      <Input id="login-email" type="email" placeholder="you@example.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="login-password">Password</Label>
-                      <Input id="login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleLogin} disabled={isLoading}>
-                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm">Join as Expert</Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Join ExpertBridge</DialogTitle>
-                    <DialogDescription>Create your professional profile and connect with clients globally</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-name">Full Name *</Label>
-                        <Input id="reg-name" placeholder="John Doe" value={regForm.fullName} onChange={(e) => setRegForm({...regForm, fullName: e.target.value})} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-email">Email *</Label>
-                        <Input id="reg-email" type="email" placeholder="you@example.com" value={regForm.email} onChange={(e) => setRegForm({...regForm, email: e.target.value})} />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-phone">Phone</Label>
-                        <Input id="reg-phone" placeholder="+1234567890" value={regForm.phone} onChange={(e) => setRegForm({...regForm, phone: e.target.value})} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-category">Category *</Label>
-                        <Select value={regForm.category} onValueChange={(value) => setRegForm({...regForm, category: value})}>
-                          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                          <SelectContent>
-                            {CATEGORIES.map(cat => (
-                              <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-subcategory">Specialization</Label>
-                        <Input id="reg-subcategory" placeholder="e.g., Corporate Lawyer" value={regForm.subcategory} onChange={(e) => setRegForm({...regForm, subcategory: e.target.value})} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-experience">Years of Experience *</Label>
-                        <Input id="reg-experience" type="number" min="0" placeholder="5" value={regForm.experience} onChange={(e) => setRegForm({...regForm, experience: e.target.value})} />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-bio">Professional Bio * (min 100 chars)</Label>
-                      <Textarea id="reg-bio" placeholder="Describe your expertise, qualifications, and what makes you unique..." className="min-h-[100px]" value={regForm.bio} onChange={(e) => setRegForm({...regForm, bio: e.target.value})} />
-                      <p className="text-xs text-muted-foreground">{regForm.bio.length}/100 characters minimum</p>
-                    </div>
-                    <Separator />
-                    <h4 className="font-medium">Location</h4>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-country">Country *</Label>
-                        <Input id="reg-country" placeholder="Nigeria" value={regForm.country} onChange={(e) => setRegForm({...regForm, country: e.target.value})} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-state">State/Region *</Label>
-                        <Input id="reg-state" placeholder="Lagos" value={regForm.state} onChange={(e) => setRegForm({...regForm, state: e.target.value})} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-city">City *</Label>
-                        <Input id="reg-city" placeholder="Lagos" value={regForm.city} onChange={(e) => setRegForm({...regForm, city: e.target.value})} />
-                      </div>
-                    </div>
-                    <Separator />
-                    <h4 className="font-medium">Service Options</h4>
-                    <div className="flex flex-wrap gap-4">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="reg-virtual" checked={regForm.virtual} onCheckedChange={(checked) => setRegForm({...regForm, virtual: checked})} />
-                        <Label htmlFor="reg-virtual">Virtual consultations</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="reg-inperson" checked={regForm.inPerson} onCheckedChange={(checked) => setRegForm({...regForm, inPerson: checked})} />
-                        <Label htmlFor="reg-inperson">In-person meetings</Label>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-languages">Languages (comma-separated)</Label>
-                      <Input id="reg-languages" placeholder="English, French, Yoruba" value={regForm.languages} onChange={(e) => setRegForm({...regForm, languages: e.target.value})} />
-                    </div>
-                    <Separator />
-                    <h4 className="font-medium">Password</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-password">Password *</Label>
-                        <Input id="reg-password" type="password" placeholder="••••••••" value={regForm.password} onChange={(e) => setRegForm({...regForm, password: e.target.value})} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reg-confirm">Confirm Password *</Label>
-                        <Input id="reg-confirm" type="password" placeholder="••••••••" value={regForm.confirmPassword} onChange={(e) => setRegForm({...regForm, confirmPassword: e.target.value})} />
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleRegister} disabled={isLoading} className="w-full">
-                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                      Create Profile
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              <Dialog open={isAdminLoginDialogOpen} onOpenChange={setIsAdminLoginDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">Admin</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Admin Login</DialogTitle>
-                    <DialogDescription>Sign in to the admin dashboard</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="admin-email">Email</Label>
-                      <Input id="admin-email" type="email" placeholder="admin@expertbridge.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="admin-password">Password</Label>
-                      <Input id="admin-password" type="password" placeholder="••••••••" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button onClick={handleAdminLogin} disabled={isLoading}>
-                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </>
-          )}
-
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
-        </div>
-      </div>
-
-      {/* Mobile menu */}
-      {isMenuOpen && (
-        <div className="md:hidden border-t p-4 space-y-2">
-          <button onClick={() => { setCurrentView('home'); setIsMenuOpen(false); }} className="block w-full text-left py-2">Home</button>
-          <button onClick={() => { handleSearch({ category: '', keyword: '', country: '' }); setIsMenuOpen(false); }} className="block w-full text-left py-2">Find Experts</button>
-          <button onClick={() => { setCurrentView('about'); setIsMenuOpen(false); }} className="block w-full text-left py-2">About</button>
-        </div>
-      )}
-    </header>
-  )
-
-  // Footer Component
-  const Footer = () => (
-    <footer className="border-t bg-muted/40">
-      <div className="container py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">EB</span>
-              </div>
-              <span className="font-bold">ExpertBridge</span>
-            </div>
-            <p className="text-sm text-muted-foreground">Connecting clients with verified professionals worldwide.</p>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Categories</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              {CATEGORIES.slice(0, 5).map(cat => (
-                <li key={cat.name}>
-                  <button onClick={() => handleCategoryClick(cat.name)} className="hover:text-primary transition-colors">{cat.name}</button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Company</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><button onClick={() => setCurrentView('about')} className="hover:text-primary">About Us</button></li>
-              <li><button className="hover:text-primary">How It Works</button></li>
-              <li><button className="hover:text-primary">Contact</button></li>
-              <li><button className="hover:text-primary">Terms of Service</button></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">For Professionals</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><button onClick={() => setIsRegisterDialogOpen(true)} className="hover:text-primary">Join as Expert</button></li>
-              <li><button className="hover:text-primary">Pricing</button></li>
-              <li><button className="hover:text-primary">Success Stories</button></li>
-            </ul>
-          </div>
-        </div>
-        <Separator className="my-8" />
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <p>© 2025 ExpertBridge. All rights reserved.</p>
-          <div className="flex gap-4">
-            <button className="hover:text-primary">Privacy Policy</button>
-            <button className="hover:text-primary">Terms</button>
-          </div>
-        </div>
-      </div>
-    </footer>
-  )
-
-  // Professional Card Component
-  const ProfessionalCard = ({ professional, onClick }) => (
-    <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group" onClick={onClick}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start gap-4">
-          <Avatar className="h-16 w-16 border-2 border-primary/10">
-            <AvatarImage src={professional.profilePhoto?.url} alt={professional.fullName} />
-            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-              {professional.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-lg truncate">{professional.fullName}</CardTitle>
-              {professional.verification?.status === 'approved' && (
-                <CheckCircle className="h-4 w-4 text-blue-500 flex-shrink-0" />
-              )}
-            </div>
-            <CardDescription className="flex items-center gap-1">
-              <Badge variant="secondary" className="font-normal">{professional.category}</Badge>
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pb-3">
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{professional.bio}</p>
-        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            {professional.location?.city}, {professional.location?.country}
-          </span>
-          <span className="flex items-center gap-1">
-            <Briefcase className="h-3 w-3" />
-            {professional.experience} years
-          </span>
-          {professional.ratings?.count > 0 && (
-            <span className="flex items-center gap-1">
-              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-              {professional.ratings.average} ({professional.ratings.count})
-            </span>
-          )}
-        </div>
-      </CardContent>
-      <CardFooter className="pt-0">
-        <div className="flex gap-2">
-          {professional.serviceOptions?.virtual && <Badge variant="outline" className="text-xs">Virtual</Badge>}
-          {professional.serviceOptions?.inPerson && <Badge variant="outline" className="text-xs">In-Person</Badge>}
-        </div>
-      </CardFooter>
-    </Card>
-  )
-
   // Home View
   const HomeView = () => (
     <div>
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
         <div className="absolute inset-0 bg-black/20"></div>
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-30"></div>
-        <div className="container relative py-20 md:py-32">
-          <div className="max-w-3xl">
-            <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/30">🌍 Connecting professionals globally</Badge>
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-              Find Verified <span className="text-blue-200">Professionals</span> You Can Trust
-            </h1>
-            <p className="text-xl text-blue-100 mb-8 max-w-2xl">
-              ExpertBridge connects you with verified experts across 20+ categories — lawyers, psychologists, financial advisors, and more. Virtual or in-person, anywhere in the world.
-            </p>
-            
-            {/* Search Box */}
-            <Card className="p-2 bg-white/95 backdrop-blur">
-              <div className="flex flex-col md:flex-row gap-2">
-                <div className="flex-1">
-                  <Select value={searchParams.category} onValueChange={(value) => setSearchParams({...searchParams, category: value})}>
-                    <SelectTrigger className="border-0 bg-transparent">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      {CATEGORIES.map(cat => (
-                        <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+        <div className="container relative py-16 md:py-24">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/30">🌍 Connecting professionals globally</Badge>
+              <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+                Find Verified <span className="text-blue-200">Professionals</span> You Can Trust
+              </h1>
+              <p className="text-lg text-blue-100 mb-8 max-w-xl">
+                ExpertBridge connects you with verified experts across 20+ categories — lawyers, psychologists, financial advisors, and more. Virtual or in-person, anywhere in the world.
+              </p>
+              
+              {/* Search Box */}
+              <Card className="p-2 bg-white/95 backdrop-blur">
+                <div className="flex flex-col md:flex-row gap-2">
+                  <div className="flex-1">
+                    <Select value={searchCategory} onValueChange={setSearchCategory}>
+                      <SelectTrigger className="border-0 bg-transparent">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {CATEGORIES.map(cat => (
+                          <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1">
+                    <Input 
+                      placeholder="Location (city or country)" 
+                      className="border-0 bg-transparent"
+                      value={searchLocation}
+                      onChange={(e) => setSearchLocation(e.target.value)}
+                    />
+                  </div>
+                  <Button size="lg" onClick={() => handleSearch(searchCategory, searchLocation, searchKeyword)} className="px-8">
+                    <Search className="h-4 w-4 mr-2" />
+                    Search
+                  </Button>
                 </div>
-                <div className="flex-1">
-                  <Input 
-                    placeholder="Location (city or country)" 
-                    className="border-0 bg-transparent"
-                    value={searchParams.country}
-                    onChange={(e) => setSearchParams({...searchParams, country: e.target.value})}
-                  />
-                </div>
-                <Button size="lg" onClick={() => handleSearch()} className="px-8">
-                  <Search className="h-4 w-4 mr-2" />
-                  Search
-                </Button>
-              </div>
-            </Card>
+              </Card>
 
-            <div className="flex flex-wrap gap-4 mt-8 text-sm">
-              <span className="flex items-center gap-2"><CheckCircle className="h-4 w-4" /> Verified Professionals</span>
-              <span className="flex items-center gap-2"><Shield className="h-4 w-4" /> Secure Platform</span>
-              <span className="flex items-center gap-2"><Globe className="h-4 w-4" /> Global Network</span>
+              <div className="flex flex-wrap gap-4 mt-8 text-sm">
+                <span className="flex items-center gap-2"><CheckCircle className="h-4 w-4" /> Verified Professionals</span>
+                <span className="flex items-center gap-2"><Shield className="h-4 w-4" /> Secure Platform</span>
+                <span className="flex items-center gap-2"><Globe className="h-4 w-4" /> Global Network</span>
+              </div>
+            </div>
+            
+            {/* Hero Image */}
+            <div className="hidden lg:block">
+              <div className="relative">
+                <div className="absolute -inset-4 bg-white/10 rounded-3xl blur-2xl"></div>
+                <img 
+                  src={HERO_IMAGE} 
+                  alt="Professional consultation" 
+                  className="relative rounded-2xl shadow-2xl w-full h-[400px] object-cover object-center"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -876,7 +833,7 @@ export default function App() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Category</Label>
-                <Select value={searchParams.category} onValueChange={(value) => setSearchParams({...searchParams, category: value})}>
+                <Select value={searchCategory} onValueChange={setSearchCategory}>
                   <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
@@ -890,19 +847,19 @@ export default function App() {
                 <Label>Location</Label>
                 <Input 
                   placeholder="City or country" 
-                  value={searchParams.country}
-                  onChange={(e) => setSearchParams({...searchParams, country: e.target.value})}
+                  value={searchLocation}
+                  onChange={(e) => setSearchLocation(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Keyword</Label>
                 <Input 
                   placeholder="Search by name or skill" 
-                  value={searchParams.keyword}
-                  onChange={(e) => setSearchParams({...searchParams, keyword: e.target.value})}
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
                 />
               </div>
-              <Button className="w-full" onClick={() => handleSearch()}>
+              <Button className="w-full" onClick={() => handleSearch(searchCategory, searchLocation, searchKeyword)}>
                 Apply Filters
               </Button>
             </CardContent>
@@ -928,8 +885,10 @@ export default function App() {
               <h3 className="text-lg font-semibold mb-2">No professionals found</h3>
               <p className="text-muted-foreground mb-4">Try adjusting your filters or search criteria</p>
               <Button variant="outline" onClick={() => {
-                setSearchParams({ category: '', keyword: '', country: '' })
-                handleSearch({ category: '', keyword: '', country: '' })
+                setSearchCategory('')
+                setSearchLocation('')
+                setSearchKeyword('')
+                handleSearch('', '', '')
               }}>
                 Clear Filters
               </Button>
@@ -954,7 +913,7 @@ export default function App() {
                       key={page} 
                       variant={page === pagination.page ? 'default' : 'outline'} 
                       size="sm"
-                      onClick={() => handleSearch(searchParams, page)}
+                      onClick={() => handleSearch(searchCategory, searchLocation, searchKeyword, page)}
                     >
                       {page}
                     </Button>
@@ -973,10 +932,13 @@ export default function App() {
     const professional = selectedProfessional?.professional
     const reviews = selectedProfessional?.reviews || []
     const [showReviewForm, setShowReviewForm] = useState(false)
-    const [reviewForm, setReviewForm] = useState({ clientName: '', clientEmail: '', rating: 5, comment: '' })
+    const [reviewName, setReviewName] = useState('')
+    const [reviewEmail, setReviewEmail] = useState('')
+    const [reviewRating, setReviewRating] = useState(5)
+    const [reviewComment, setReviewComment] = useState('')
 
     const submitReview = async () => {
-      if (!reviewForm.clientName || !reviewForm.clientEmail || !reviewForm.comment) {
+      if (!reviewName || !reviewEmail || !reviewComment) {
         toast.error('Please fill in all fields')
         return
       }
@@ -984,12 +946,21 @@ export default function App() {
         const res = await fetch('/api/reviews', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...reviewForm, professionalId: professional.id })
+          body: JSON.stringify({ 
+            professionalId: professional.id,
+            clientName: reviewName,
+            clientEmail: reviewEmail,
+            rating: reviewRating,
+            comment: reviewComment
+          })
         })
         if (res.ok) {
           toast.success('Review submitted for approval')
           setShowReviewForm(false)
-          setReviewForm({ clientName: '', clientEmail: '', rating: 5, comment: '' })
+          setReviewName('')
+          setReviewEmail('')
+          setReviewRating(5)
+          setReviewComment('')
         }
       } catch (error) {
         toast.error('Failed to submit review')
@@ -1106,26 +1077,26 @@ export default function App() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label>Your Name</Label>
-                          <Input value={reviewForm.clientName} onChange={(e) => setReviewForm({...reviewForm, clientName: e.target.value})} />
+                          <Input value={reviewName} onChange={(e) => setReviewName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                           <Label>Your Email</Label>
-                          <Input type="email" value={reviewForm.clientEmail} onChange={(e) => setReviewForm({...reviewForm, clientEmail: e.target.value})} />
+                          <Input type="email" value={reviewEmail} onChange={(e) => setReviewEmail(e.target.value)} />
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label>Rating</Label>
                         <div className="flex gap-1">
                           {[1, 2, 3, 4, 5].map((star) => (
-                            <button key={star} onClick={() => setReviewForm({...reviewForm, rating: star})}>
-                              <Star className={`h-6 w-6 ${star <= reviewForm.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
+                            <button key={star} onClick={() => setReviewRating(star)}>
+                              <Star className={`h-6 w-6 ${star <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
                             </button>
                           ))}
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label>Your Review</Label>
-                        <Textarea value={reviewForm.comment} onChange={(e) => setReviewForm({...reviewForm, comment: e.target.value})} placeholder="Share your experience..." />
+                        <Textarea value={reviewComment} onChange={(e) => setReviewComment(e.target.value)} placeholder="Share your experience..." />
                       </div>
                       <Button onClick={submitReview}>Submit Review</Button>
                     </CardContent>
@@ -1337,7 +1308,7 @@ export default function App() {
       if (userRole === 'admin' && token) {
         fetchAdminData()
       }
-    }, [userRole, token])
+    }, [])
 
     if (!user || userRole !== 'admin') return null
 
@@ -1542,10 +1513,140 @@ export default function App() {
     </div>
   )
 
+  // Footer Component
+  const Footer = () => (
+    <footer className="border-t bg-muted/40">
+      <div className="container py-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">EB</span>
+              </div>
+              <span className="font-bold">ExpertBridge</span>
+            </div>
+            <p className="text-sm text-muted-foreground">Connecting clients with verified professionals worldwide.</p>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">Categories</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              {CATEGORIES.slice(0, 5).map(cat => (
+                <li key={cat.name}>
+                  <button onClick={() => handleCategoryClick(cat.name)} className="hover:text-primary transition-colors">{cat.name}</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">Company</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li><button onClick={() => setCurrentView('about')} className="hover:text-primary">About Us</button></li>
+              <li><button className="hover:text-primary">How It Works</button></li>
+              <li><button className="hover:text-primary">Contact</button></li>
+              <li><button className="hover:text-primary">Terms of Service</button></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">For Professionals</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li><button onClick={() => setIsRegisterDialogOpen(true)} className="hover:text-primary">Join as Expert</button></li>
+              <li><button className="hover:text-primary">Pricing</button></li>
+              <li><button className="hover:text-primary">Success Stories</button></li>
+            </ul>
+          </div>
+        </div>
+        <Separator className="my-8" />
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+          <p>© 2025 ExpertBridge. All rights reserved.</p>
+          <div className="flex gap-4">
+            <button className="hover:text-primary">Privacy Policy</button>
+            <button className="hover:text-primary">Terms</button>
+          </div>
+        </div>
+      </div>
+    </footer>
+  )
+
   // Main render
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('home')}>
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">EB</span>
+            </div>
+            <span className="font-bold text-xl hidden sm:block">ExpertBridge</span>
+          </div>
+
+          <nav className="hidden md:flex items-center gap-6">
+            <button onClick={() => setCurrentView('home')} className="text-sm font-medium hover:text-primary transition-colors">
+              Home
+            </button>
+            <button onClick={() => handleSearch('', '', '')} className="text-sm font-medium hover:text-primary transition-colors">
+              Find Experts
+            </button>
+            <button onClick={() => setCurrentView('about')} className="text-sm font-medium hover:text-primary transition-colors">
+              About
+            </button>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            {user ? (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => setCurrentView(userRole === 'admin' ? 'admin' : 'dashboard')}>
+                  <User className="h-4 w-4 mr-2" />
+                  {user.fullName?.split(' ')[0] || 'Dashboard'}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" onClick={() => setIsLoginDialogOpen(true)}>Login</Button>
+                <Button size="sm" onClick={() => setIsRegisterDialogOpen(true)}>Join as Expert</Button>
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setIsAdminLoginDialogOpen(true)}>Admin</Button>
+              </>
+            )}
+
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile menu */}
+        {isMenuOpen && (
+          <div className="md:hidden border-t p-4 space-y-2">
+            <button onClick={() => { setCurrentView('home'); setIsMenuOpen(false); }} className="block w-full text-left py-2">Home</button>
+            <button onClick={() => { handleSearch('', '', ''); setIsMenuOpen(false); }} className="block w-full text-left py-2">Find Experts</button>
+            <button onClick={() => { setCurrentView('about'); setIsMenuOpen(false); }} className="block w-full text-left py-2">About</button>
+          </div>
+        )}
+      </header>
+
+      {/* Dialogs */}
+      <LoginDialog 
+        open={isLoginDialogOpen} 
+        onOpenChange={setIsLoginDialogOpen} 
+        onLogin={handleLogin} 
+        isLoading={isLoading} 
+      />
+      <AdminLoginDialog 
+        open={isAdminLoginDialogOpen} 
+        onOpenChange={setIsAdminLoginDialogOpen} 
+        onLogin={handleAdminLogin} 
+        isLoading={isLoading} 
+      />
+      <RegisterDialog 
+        open={isRegisterDialogOpen} 
+        onOpenChange={setIsRegisterDialogOpen} 
+        onRegister={handleRegister} 
+        isLoading={isLoading} 
+      />
+
       <main className="flex-1">
         {currentView === 'home' && <HomeView />}
         {currentView === 'search' && <SearchView />}
