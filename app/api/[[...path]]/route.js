@@ -740,20 +740,36 @@ async function handleRoute(request, { params }) {
         return handleCORS(NextResponse.json({ error: 'Professional not found' }, { status: 404 }))
       }
 
+      const reviewRating = Math.min(5, Math.max(1, parseInt(rating)))
+      
       const review = {
         id: uuidv4(),
         professionalId,
         clientName,
         clientEmail: clientEmail.toLowerCase(),
-        rating: Math.min(5, Math.max(1, parseInt(rating))),
+        rating: reviewRating,
         comment,
         isVerified: false,
-        status: 'pending',
+        status: 'approved', // Auto-approve reviews - no admin approval needed
         createdAt: new Date()
       }
 
       await db.collection('reviews').insertOne(review)
-      return handleCORS(NextResponse.json({ message: 'Review submitted for approval', review }))
+
+      // Update professional's average rating immediately
+      const allApprovedReviews = await db.collection('reviews')
+        .find({ professionalId, status: 'approved' })
+        .toArray()
+
+      if (allApprovedReviews.length > 0) {
+        const avgRating = allApprovedReviews.reduce((sum, r) => sum + r.rating, 0) / allApprovedReviews.length
+        await db.collection('professionals').updateOne(
+          { id: professionalId },
+          { $set: { 'ratings.average': Math.round(avgRating * 10) / 10, 'ratings.count': allApprovedReviews.length } }
+        )
+      }
+
+      return handleCORS(NextResponse.json({ message: 'Review submitted successfully', review }))
     }
 
     // Get reviews for a professional
