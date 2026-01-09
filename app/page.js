@@ -20,7 +20,7 @@ import {
   Users, Award, CheckCircle, Clock, Filter, ChevronRight, Menu, X, LogOut,
   Building, Briefcase, Heart, Shield, TrendingUp, Eye, MousePointer,
   User, Settings, BarChart3, FileCheck, XCircle, Loader2, Edit, BadgeCheck,
-  Camera, Upload, CreditCard, Trash2, Crown
+  Camera, Upload, CreditCard, Trash2, Crown, Code, Palette, GraduationCap, Home, UtensilsCrossed, FileText
 } from 'lucide-react'
 
 const CATEGORIES = [
@@ -43,7 +43,12 @@ const CATEGORIES = [
   { name: 'Immigration Consultant', icon: Globe, color: 'bg-blue-500' },
   { name: 'Event Planner', icon: Award, color: 'bg-violet-500' },
   { name: 'Interior Designer', icon: Building, color: 'bg-lime-500' },
-  { name: 'Education Consultant', icon: Award, color: 'bg-emerald-600' }
+  { name: 'Education Consultant', icon: Award, color: 'bg-emerald-600' },
+  { name: 'Web Developer', icon: Code, color: 'bg-blue-700' },
+  { name: 'Graphics Designer', icon: Palette, color: 'bg-pink-600' },
+  { name: 'Teacher', icon: GraduationCap, color: 'bg-indigo-600' },
+  { name: 'Housing Agent', icon: Home, color: 'bg-amber-600' },
+  { name: 'Caterer', icon: UtensilsCrossed, color: 'bg-orange-600' }
 ]
 
 const HERO_IMAGE = 'https://images.pexels.com/photos/7616608/pexels-photo-7616608.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
