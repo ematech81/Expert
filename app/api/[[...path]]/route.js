@@ -3,12 +3,46 @@ import { v4 as uuidv4 } from 'uuid'
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { v2 as cloudinary } from 'cloudinary'
+import sgMail from '@sendgrid/mail'
 
 // MongoDB connection
 let client
 let db
 
 const JWT_SECRET = process.env.JWT_SECRET || 'expertbridge-secret-key-2024'
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+})
+
+// Configure SendGrid
+if (process.env.SENDGRID_API_KEY && process.env.SENDGRID_API_KEY !== 'your_sendgrid_api_key') {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY)
+}
+
+// Subscription Plans
+const SUBSCRIPTION_PLANS = {
+  monthly: {
+    id: 'monthly',
+    name: 'Monthly Subscription',
+    amount: 1500000, // ₦15,000 in kobo
+    currency: 'NGN',
+    duration: 30, // days
+    benefits: ['Featured Expert Carousel', 'Verified Badge', 'Social Media Promotions']
+  },
+  yearly: {
+    id: 'yearly',
+    name: 'Yearly Subscription',
+    amount: 4000000, // ₦40,000 in kobo
+    currency: 'NGN',
+    duration: 365, // days
+    benefits: ['Featured Expert Carousel', 'Verified Badge', 'Social Media Promotions', 'Google Ads Inclusion']
+  }
+}
 
 const CATEGORIES = [
   'Psychologist', 'Lawyer', 'Financial Advisor', 'Career Coach',
@@ -49,6 +83,191 @@ function verifyToken(request) {
   } catch (error) {
     return null
   }
+}
+
+// Email sending helper function
+async function sendEmail(to, subject, htmlContent) {
+  if (!process.env.SENDGRID_API_KEY || process.env.SENDGRID_API_KEY === 'your_sendgrid_api_key') {
+    console.log('SendGrid not configured. Email would be sent to:', to, 'Subject:', subject)
+    return { success: true, mocked: true }
+  }
+
+  try {
+    const msg = {
+      to,
+      from: {
+        email: process.env.SENDGRID_FROM_EMAIL || 'noreply@expertbridge.com',
+        name: process.env.SENDGRID_FROM_NAME || 'ExpertBridge'
+      },
+      subject,
+      html: htmlContent
+    }
+    await sgMail.send(msg)
+    return { success: true }
+  } catch (error) {
+    console.error('SendGrid Error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+// Email Templates
+function getApprovalEmailTemplate(name) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #2563eb, #4f46e5); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f8fafc; padding: 30px; border-radius: 0 0 8px 8px; }
+        .button { display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Congratulations! You're Approved!</h1>
+        </div>
+        <div class="content">
+          <p>Dear ${name},</p>
+          <p>Great news! Your ExpertBridge profile has been <strong>approved</strong>.</p>
+          <p>You are now visible to potential clients searching for professionals in your category. Here's what you can do next:</p>
+          <ul>
+            <li>Complete your profile with more details</li>
+            <li>Add a professional photo</li>
+            <li>Consider upgrading to Featured status for more visibility</li>
+          </ul>
+          <a href="${process.env.NEXT_PUBLIC_BASE_URL}" class="button">Visit Your Dashboard</a>
+          <p>Thank you for joining ExpertBridge!</p>
+        </div>
+        <div class="footer">
+          <p>© 2025 ExpertBridge. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+function getRejectionEmailTemplate(name, reason) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #64748b; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f8fafc; padding: 30px; border-radius: 0 0 8px 8px; }
+        .reason { background: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; }
+        .button { display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Profile Review Update</h1>
+        </div>
+        <div class="content">
+          <p>Dear ${name},</p>
+          <p>Thank you for your interest in joining ExpertBridge. After reviewing your application, we were unable to approve your profile at this time.</p>
+          <div class="reason">
+            <strong>Reason:</strong> ${reason || 'Does not meet verification requirements'}
+          </div>
+          <p>You may update your profile and resubmit for review. If you have questions, please contact our support team.</p>
+          <a href="${process.env.NEXT_PUBLIC_BASE_URL}" class="button">Update Your Profile</a>
+        </div>
+        <div class="footer">
+          <p>© 2025 ExpertBridge. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+function getWelcomeEmailTemplate(name) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #2563eb, #4f46e5); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f8fafc; padding: 30px; border-radius: 0 0 8px 8px; }
+        .button { display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Welcome to ExpertBridge!</h1>
+        </div>
+        <div class="content">
+          <p>Dear ${name},</p>
+          <p>Thank you for registering on ExpertBridge! Your profile has been submitted and is currently <strong>pending review</strong>.</p>
+          <p>Our team will review your application within 24-48 hours. You'll receive an email notification once your profile is approved.</p>
+          <p>In the meantime, you can:</p>
+          <ul>
+            <li>Log in to view your dashboard</li>
+            <li>Add more details to your profile</li>
+            <li>Upload verification documents</li>
+          </ul>
+          <a href="${process.env.NEXT_PUBLIC_BASE_URL}" class="button">Go to Dashboard</a>
+        </div>
+        <div class="footer">
+          <p>© 2025 ExpertBridge. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+function getSubscriptionEmailTemplate(name, plan, expiryDate) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+        .content { background: #f8fafc; padding: 30px; border-radius: 0 0 8px 8px; }
+        .benefits { background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .button { display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Subscription Activated!</h1>
+        </div>
+        <div class="content">
+          <p>Dear ${name},</p>
+          <p>Your <strong>${plan.name}</strong> subscription has been activated successfully!</p>
+          <div class="benefits">
+            <h3>Your Benefits:</h3>
+            <ul>
+              ${plan.benefits.map(b => `<li>${b}</li>`).join('')}
+            </ul>
+          </div>
+          <p><strong>Subscription Valid Until:</strong> ${new Date(expiryDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          <a href="${process.env.NEXT_PUBLIC_BASE_URL}" class="button">View Your Profile</a>
+        </div>
+        <div class="footer">
+          <p>© 2025 ExpertBridge. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
 }
 
 // OPTIONS handler for CORS
@@ -131,6 +350,13 @@ async function handleRoute(request, { params }) {
           featuredUntil: null,
           featuredTier: 'basic'
         },
+        subscription: {
+          plan: null,
+          status: 'inactive',
+          startDate: null,
+          endDate: null,
+          paystackRef: null
+        },
         analytics: {
           profileViews: 0,
           contactClicks: 0,
@@ -147,6 +373,13 @@ async function handleRoute(request, { params }) {
       }
 
       await db.collection('professionals').insertOne(professional)
+
+      // Send welcome email
+      await sendEmail(
+        professional.email,
+        'Welcome to ExpertBridge!',
+        getWelcomeEmailTemplate(professional.fullName)
+      )
 
       const token = jwt.sign({ id: professionalId, email: professional.email, role: 'professional' }, JWT_SECRET, { expiresIn: '7d' })
 
@@ -280,8 +513,28 @@ async function handleRoute(request, { params }) {
       }))
     }
 
+    // Get featured professionals only
+    if (route === '/professionals/featured' && method === 'GET') {
+      const url = new URL(request.url)
+      const limit = parseInt(url.searchParams.get('limit')) || 6
+
+      const professionals = await db.collection('professionals')
+        .find({
+          'verification.status': 'approved',
+          isActive: true,
+          'featured.isFeatured': true,
+          'featured.featuredUntil': { $gt: new Date() }
+        })
+        .project({ password: 0 })
+        .sort({ 'ratings.average': -1, createdAt: -1 })
+        .limit(limit)
+        .toArray()
+
+      return handleCORS(NextResponse.json({ professionals }))
+    }
+
     // Get single professional (public)
-    if (route.match(/^\/professionals\/[^/]+$/) && method === 'GET') {
+    if (route.match(/^\/professionals\/[^/]+$/) && !route.includes('featured') && method === 'GET') {
       const professionalId = path[1]
       const professional = await db.collection('professionals').findOne({ id: professionalId })
 
@@ -352,6 +605,70 @@ async function handleRoute(request, { params }) {
         { $inc: { 'analytics.contactClicks': 1 } }
       )
       return handleCORS(NextResponse.json({ message: 'Contact click tracked' }))
+    }
+
+    // ==================== UPLOAD ROUTES ====================
+
+    // Upload profile photo
+    if (route === '/upload/profile-photo' && method === 'POST') {
+      const user = verifyToken(request)
+      if (!user || user.role !== 'professional') {
+        return handleCORS(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
+      }
+
+      const body = await request.json()
+      const { imageData } = body // Base64 encoded image
+
+      if (!imageData) {
+        return handleCORS(NextResponse.json({ error: 'No image data provided' }, { status: 400 }))
+      }
+
+      // Check if Cloudinary is configured
+      if (!process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_CLOUD_NAME === 'your_cloud_name') {
+        // Return a mock response if Cloudinary is not configured
+        return handleCORS(NextResponse.json({ 
+          message: 'Cloudinary not configured. Image upload simulated.',
+          url: `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=3b82f6&color=fff&size=200`,
+          publicId: null,
+          mocked: true
+        }))
+      }
+
+      try {
+        // Upload to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(imageData, {
+          folder: 'expertbridge/profiles',
+          public_id: `profile_${user.id}`,
+          overwrite: true,
+          transformation: [
+            { width: 400, height: 400, crop: 'fill', gravity: 'face' },
+            { quality: 'auto' }
+          ]
+        })
+
+        // Update professional's profile photo
+        await db.collection('professionals').updateOne(
+          { id: user.id },
+          {
+            $set: {
+              profilePhoto: {
+                url: uploadResult.secure_url,
+                publicId: uploadResult.public_id
+              },
+              updatedAt: new Date()
+            }
+          }
+        )
+
+        return handleCORS(NextResponse.json({
+          message: 'Profile photo updated',
+          url: uploadResult.secure_url,
+          publicId: uploadResult.public_id
+        }))
+      } catch (error) {
+        console.error('Cloudinary upload error:', error)
+        return handleCORS(NextResponse.json({ error: 'Failed to upload image' }, { status: 500 }))
+      }
     }
 
     // ==================== SEARCH ROUTES ====================
@@ -449,6 +766,245 @@ async function handleRoute(request, { params }) {
       return handleCORS(NextResponse.json({ reviews }))
     }
 
+    // ==================== SUBSCRIPTION ROUTES ====================
+
+    // Get subscription plans
+    if (route === '/subscriptions/plans' && method === 'GET') {
+      return handleCORS(NextResponse.json({ plans: SUBSCRIPTION_PLANS }))
+    }
+
+    // Initialize Paystack payment
+    if (route === '/subscriptions/initialize' && method === 'POST') {
+      const user = verifyToken(request)
+      if (!user || user.role !== 'professional') {
+        return handleCORS(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
+      }
+
+      const body = await request.json()
+      const { planId } = body
+
+      const plan = SUBSCRIPTION_PLANS[planId]
+      if (!plan) {
+        return handleCORS(NextResponse.json({ error: 'Invalid plan' }, { status: 400 }))
+      }
+
+      const professional = await db.collection('professionals').findOne({ id: user.id })
+      if (!professional) {
+        return handleCORS(NextResponse.json({ error: 'Professional not found' }, { status: 404 }))
+      }
+
+      // Check if Paystack is configured
+      if (!process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET_KEY === 'your_paystack_secret_key') {
+        // Return mock response for testing
+        const mockRef = `mock_${uuidv4()}`
+        return handleCORS(NextResponse.json({
+          message: 'Paystack not configured. Payment simulated.',
+          authorization_url: `${process.env.NEXT_PUBLIC_BASE_URL}?payment=mock&ref=${mockRef}`,
+          reference: mockRef,
+          mocked: true
+        }))
+      }
+
+      // Initialize Paystack transaction
+      try {
+        const reference = `sub_${uuidv4()}`
+        const response = await fetch('https://api.paystack.co/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: professional.email,
+            amount: plan.amount,
+            reference,
+            callback_url: `${process.env.NEXT_PUBLIC_BASE_URL}/api/subscriptions/verify?reference=${reference}`,
+            metadata: {
+              professional_id: user.id,
+              plan_id: planId,
+              plan_name: plan.name
+            }
+          })
+        })
+
+        const data = await response.json()
+
+        if (!data.status) {
+          return handleCORS(NextResponse.json({ error: data.message || 'Payment initialization failed' }, { status: 400 }))
+        }
+
+        // Store pending subscription
+        await db.collection('subscriptions').insertOne({
+          id: uuidv4(),
+          professionalId: user.id,
+          planId,
+          reference,
+          amount: plan.amount,
+          status: 'pending',
+          createdAt: new Date()
+        })
+
+        return handleCORS(NextResponse.json({
+          authorization_url: data.data.authorization_url,
+          reference: data.data.reference
+        }))
+      } catch (error) {
+        console.error('Paystack error:', error)
+        return handleCORS(NextResponse.json({ error: 'Payment initialization failed' }, { status: 500 }))
+      }
+    }
+
+    // Verify Paystack payment
+    if (route === '/subscriptions/verify' && method === 'GET') {
+      const url = new URL(request.url)
+      const reference = url.searchParams.get('reference')
+
+      if (!reference) {
+        return handleCORS(NextResponse.json({ error: 'Reference required' }, { status: 400 }))
+      }
+
+      // Check for mock payment
+      if (reference.startsWith('mock_')) {
+        return handleCORS(NextResponse.json({
+          message: 'Mock payment verified',
+          mocked: true
+        }))
+      }
+
+      // Check if Paystack is configured
+      if (!process.env.PAYSTACK_SECRET_KEY || process.env.PAYSTACK_SECRET_KEY === 'your_paystack_secret_key') {
+        return handleCORS(NextResponse.json({ error: 'Paystack not configured' }, { status: 400 }))
+      }
+
+      try {
+        const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+          headers: {
+            'Authorization': `Bearer ${process.env.PAYSTACK_SECRET_KEY}`
+          }
+        })
+
+        const data = await response.json()
+
+        if (!data.status || data.data.status !== 'success') {
+          return handleCORS(NextResponse.json({ error: 'Payment verification failed' }, { status: 400 }))
+        }
+
+        const { professional_id, plan_id } = data.data.metadata
+        const plan = SUBSCRIPTION_PLANS[plan_id]
+
+        if (!plan) {
+          return handleCORS(NextResponse.json({ error: 'Invalid plan' }, { status: 400 }))
+        }
+
+        const startDate = new Date()
+        const endDate = new Date(startDate.getTime() + plan.duration * 24 * 60 * 60 * 1000)
+
+        // Update professional's subscription and featured status
+        await db.collection('professionals').updateOne(
+          { id: professional_id },
+          {
+            $set: {
+              'subscription.plan': plan_id,
+              'subscription.status': 'active',
+              'subscription.startDate': startDate,
+              'subscription.endDate': endDate,
+              'subscription.paystackRef': reference,
+              'featured.isFeatured': true,
+              'featured.featuredUntil': endDate,
+              'featured.featuredTier': plan_id,
+              updatedAt: new Date()
+            }
+          }
+        )
+
+        // Update subscription record
+        await db.collection('subscriptions').updateOne(
+          { reference },
+          {
+            $set: {
+              status: 'completed',
+              completedAt: new Date()
+            }
+          }
+        )
+
+        // Get professional for email
+        const professional = await db.collection('professionals').findOne({ id: professional_id })
+        if (professional) {
+          await sendEmail(
+            professional.email,
+            'Subscription Activated - ExpertBridge',
+            getSubscriptionEmailTemplate(professional.fullName, plan, endDate)
+          )
+        }
+
+        return handleCORS(NextResponse.json({
+          message: 'Subscription activated',
+          subscription: {
+            plan: plan_id,
+            startDate,
+            endDate
+          }
+        }))
+      } catch (error) {
+        console.error('Payment verification error:', error)
+        return handleCORS(NextResponse.json({ error: 'Payment verification failed' }, { status: 500 }))
+      }
+    }
+
+    // Activate subscription (for mock/testing)
+    if (route === '/subscriptions/activate' && method === 'POST') {
+      const user = verifyToken(request)
+      if (!user || user.role !== 'professional') {
+        return handleCORS(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
+      }
+
+      const body = await request.json()
+      const { planId, reference } = body
+
+      const plan = SUBSCRIPTION_PLANS[planId]
+      if (!plan) {
+        return handleCORS(NextResponse.json({ error: 'Invalid plan' }, { status: 400 }))
+      }
+
+      const startDate = new Date()
+      const endDate = new Date(startDate.getTime() + plan.duration * 24 * 60 * 60 * 1000)
+
+      // Update professional's subscription and featured status
+      await db.collection('professionals').updateOne(
+        { id: user.id },
+        {
+          $set: {
+            'subscription.plan': planId,
+            'subscription.status': 'active',
+            'subscription.startDate': startDate,
+            'subscription.endDate': endDate,
+            'subscription.paystackRef': reference || 'manual',
+            'featured.isFeatured': true,
+            'featured.featuredUntil': endDate,
+            'featured.featuredTier': planId,
+            updatedAt: new Date()
+          }
+        }
+      )
+
+      // Get updated professional
+      const professional = await db.collection('professionals').findOne({ id: user.id })
+      
+      // Send confirmation email
+      await sendEmail(
+        professional.email,
+        'Subscription Activated - ExpertBridge',
+        getSubscriptionEmailTemplate(professional.fullName, plan, endDate)
+      )
+
+      const { password: _, ...safeData } = professional
+      return handleCORS(NextResponse.json({
+        message: 'Subscription activated',
+        professional: safeData
+      }))
+    }
+
     // ==================== ADMIN ROUTES ====================
 
     // Get pending approvals
@@ -475,6 +1031,12 @@ async function handleRoute(request, { params }) {
       }
 
       const professionalId = path[2]
+      const professional = await db.collection('professionals').findOne({ id: professionalId })
+      
+      if (!professional) {
+        return handleCORS(NextResponse.json({ error: 'Professional not found' }, { status: 404 }))
+      }
+
       await db.collection('professionals').updateOne(
         { id: professionalId },
         {
@@ -485,6 +1047,13 @@ async function handleRoute(request, { params }) {
             updatedAt: new Date()
           }
         }
+      )
+
+      // Send approval email
+      await sendEmail(
+        professional.email,
+        'Your ExpertBridge Profile is Approved!',
+        getApprovalEmailTemplate(professional.fullName)
       )
 
       return handleCORS(NextResponse.json({ message: 'Professional approved' }))
@@ -498,6 +1067,12 @@ async function handleRoute(request, { params }) {
       }
 
       const professionalId = path[2]
+      const professional = await db.collection('professionals').findOne({ id: professionalId })
+      
+      if (!professional) {
+        return handleCORS(NextResponse.json({ error: 'Professional not found' }, { status: 404 }))
+      }
+
       const body = await request.json()
       const { reason } = body
 
@@ -512,7 +1087,41 @@ async function handleRoute(request, { params }) {
         }
       )
 
+      // Send rejection email
+      await sendEmail(
+        professional.email,
+        'ExpertBridge Profile Review Update',
+        getRejectionEmailTemplate(professional.fullName, reason)
+      )
+
       return handleCORS(NextResponse.json({ message: 'Professional rejected' }))
+    }
+
+    // Delete professional (admin)
+    if (route.match(/^\/admin\/professionals\/[^/]+$/) && method === 'DELETE') {
+      const user = verifyToken(request)
+      if (!user || user.role !== 'admin') {
+        return handleCORS(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
+      }
+
+      const professionalId = path[2]
+      
+      // Check if professional exists
+      const professional = await db.collection('professionals').findOne({ id: professionalId })
+      if (!professional) {
+        return handleCORS(NextResponse.json({ error: 'Professional not found' }, { status: 404 }))
+      }
+
+      // Delete professional
+      await db.collection('professionals').deleteOne({ id: professionalId })
+      
+      // Also delete their reviews
+      await db.collection('reviews').deleteMany({ professionalId })
+      
+      // Delete their subscriptions
+      await db.collection('subscriptions').deleteMany({ professionalId })
+
+      return handleCORS(NextResponse.json({ message: 'Professional deleted successfully' }))
     }
 
     // Get all professionals (admin)
@@ -556,8 +1165,13 @@ async function handleRoute(request, { params }) {
       const pendingApprovals = await db.collection('professionals').countDocuments({ 'verification.status': 'pending' })
       const approvedProfessionals = await db.collection('professionals').countDocuments({ 'verification.status': 'approved' })
       const rejectedProfessionals = await db.collection('professionals').countDocuments({ 'verification.status': 'rejected' })
+      const featuredProfessionals = await db.collection('professionals').countDocuments({ 
+        'featured.isFeatured': true, 
+        'featured.featuredUntil': { $gt: new Date() } 
+      })
       const totalReviews = await db.collection('reviews').countDocuments()
       const pendingReviews = await db.collection('reviews').countDocuments({ status: 'pending' })
+      const totalSubscriptions = await db.collection('subscriptions').countDocuments({ status: 'completed' })
 
       // Category breakdown
       const categoryBreakdown = await db.collection('professionals').aggregate([
@@ -571,8 +1185,10 @@ async function handleRoute(request, { params }) {
           pendingApprovals,
           approvedProfessionals,
           rejectedProfessionals,
+          featuredProfessionals,
           totalReviews,
-          pendingReviews
+          pendingReviews,
+          totalSubscriptions
         },
         categoryBreakdown
       }))
