@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://profconnect-22.preview.emergentagent.com/api"
+BASE_URL = "https://expertfinder-22.preview.emergentagent.com/api"
 TIMEOUT = 30
 
 class ExpertBridgeAPITester:
