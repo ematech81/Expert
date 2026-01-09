@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, memo } from 'react'
+import { useState, useEffect, useCallback, memo, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,12 +13,14 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { 
   Search, MapPin, Star, Phone, Mail, Globe, Linkedin, Twitter,
   Users, Award, CheckCircle, Clock, Filter, ChevronRight, Menu, X, LogOut,
   Building, Briefcase, Heart, Shield, TrendingUp, Eye, MousePointer,
-  User, Settings, BarChart3, FileCheck, XCircle, Loader2, Edit, BadgeCheck
+  User, Settings, BarChart3, FileCheck, XCircle, Loader2, Edit, BadgeCheck,
+  Camera, Upload, CreditCard, Trash2, Crown
 } from 'lucide-react'
 
 const CATEGORIES = [
@@ -45,6 +47,27 @@ const CATEGORIES = [
 ]
 
 const HERO_IMAGE = 'https://images.pexels.com/photos/7616608/pexels-photo-7616608.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
+
+// Subscription Plans
+const SUBSCRIPTION_PLANS = {
+  monthly: {
+    id: 'monthly',
+    name: 'Monthly Subscription',
+    amount: 15000,
+    displayAmount: '₦15,000',
+    duration: '1 Month',
+    benefits: ['Featured Expert Carousel', 'Verified Badge', 'Social Media Promotions']
+  },
+  yearly: {
+    id: 'yearly',
+    name: 'Yearly Subscription',
+    amount: 40000,
+    displayAmount: '₦40,000',
+    duration: '1 Year',
+    benefits: ['Featured Expert Carousel', 'Verified Badge', 'Social Media Promotions', 'Google Ads Inclusion'],
+    savings: 'Save ₦140,000/year'
+  }
+}
 
 // Helper function to get the appropriate badge for a professional
 function getProfessionalBadge(professional) {
@@ -338,8 +361,75 @@ function RegisterDialog({ open, onOpenChange, onRegister, isLoading }) {
   )
 }
 
+// Profile Photo Upload Component
+function ProfilePhotoUpload({ currentPhoto, onUpload, isLoading }) {
+  const fileInputRef = useRef(null)
+  const [preview, setPreview] = useState(null)
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB')
+      return
+    }
+
+    // Create preview
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      setPreview(e.target.result)
+    }
+    reader.readAsDataURL(file)
+
+    // Convert to base64 for upload
+    const base64Reader = new FileReader()
+    base64Reader.onload = async (e) => {
+      await onUpload(e.target.result)
+    }
+    base64Reader.readAsDataURL(file)
+  }
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="relative">
+        <Avatar className="h-24 w-24 border-4 border-primary/10">
+          <AvatarImage src={preview || currentPhoto} />
+          <AvatarFallback className="text-2xl bg-primary/10 text-primary">
+            <User className="h-10 w-10" />
+          </AvatarFallback>
+        </Avatar>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="absolute bottom-0 right-0 p-2 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+          disabled={isLoading}
+        >
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+        </button>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+      <div>
+        <p className="font-medium">Profile Photo</p>
+        <p className="text-sm text-muted-foreground">Click the camera icon to upload</p>
+        <p className="text-xs text-muted-foreground">Max size: 5MB</p>
+      </div>
+    </div>
+  )
+}
+
 // Edit Profile Dialog Component
-function EditProfileDialog({ open, onOpenChange, user, onSave, isLoading }) {
+function EditProfileDialog({ open, onOpenChange, user, onSave, onPhotoUpload, isLoading }) {
   const [form, setForm] = useState({
     fullName: user?.fullName || '',
     phone: user?.phone || '',
@@ -356,6 +446,7 @@ function EditProfileDialog({ open, onOpenChange, user, onSave, isLoading }) {
     twitter: user?.socialLinks?.twitter || '',
     website: user?.socialLinks?.website || ''
   })
+  const [isUploading, setIsUploading] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -382,6 +473,12 @@ function EditProfileDialog({ open, onOpenChange, user, onSave, isLoading }) {
     onSave(form)
   }
 
+  const handlePhotoUpload = async (imageData) => {
+    setIsUploading(true)
+    await onPhotoUpload(imageData)
+    setIsUploading(false)
+  }
+
   const updateForm = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
@@ -394,6 +491,15 @@ function EditProfileDialog({ open, onOpenChange, user, onSave, isLoading }) {
           <DialogDescription>Update your professional information</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          {/* Profile Photo Upload */}
+          <ProfilePhotoUpload 
+            currentPhoto={user?.profilePhoto?.url} 
+            onUpload={handlePhotoUpload}
+            isLoading={isUploading}
+          />
+          
+          <Separator />
+          
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Full Name</Label>
@@ -476,6 +582,139 @@ function EditProfileDialog({ open, onOpenChange, user, onSave, isLoading }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// Subscription Dialog Component
+function SubscriptionDialog({ open, onOpenChange, onSubscribe, isLoading, currentSubscription }) {
+  const [selectedPlan, setSelectedPlan] = useState('monthly')
+
+  const handleSubscribe = () => {
+    onSubscribe(selectedPlan)
+  }
+
+  const isActive = currentSubscription?.status === 'active' && new Date(currentSubscription?.endDate) > new Date()
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Crown className="h-5 w-5 text-amber-500" />
+            {isActive ? 'Subscription Status' : 'Upgrade to Featured Expert'}
+          </DialogTitle>
+          <DialogDescription>
+            {isActive 
+              ? 'Your current subscription details'
+              : 'Get more visibility and attract more clients'
+            }
+          </DialogDescription>
+        </DialogHeader>
+
+        {isActive ? (
+          <div className="py-4">
+            <Card className="bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 bg-amber-100 rounded-full">
+                    <Crown className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">{SUBSCRIPTION_PLANS[currentSubscription.plan]?.name || 'Active Subscription'}</h3>
+                    <p className="text-sm text-muted-foreground">Valid until {new Date(currentSubscription.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Your Benefits:</p>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {SUBSCRIPTION_PLANS[currentSubscription.plan]?.benefits.map((benefit, i) => (
+                      <li key={i} className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        {benefit}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              {Object.values(SUBSCRIPTION_PLANS).map((plan) => (
+                <Card 
+                  key={plan.id}
+                  className={`cursor-pointer transition-all ${selectedPlan === plan.id ? 'ring-2 ring-primary border-primary' : 'hover:border-primary/50'}`}
+                  onClick={() => setSelectedPlan(plan.id)}
+                >
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <h3 className="font-semibold">{plan.duration}</h3>
+                      <p className="text-2xl font-bold text-primary mt-2">{plan.displayAmount}</p>
+                      {plan.savings && (
+                        <Badge variant="secondary" className="mt-2 bg-green-100 text-green-700">
+                          {plan.savings}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="p-4 bg-muted rounded-lg">
+              <h4 className="font-medium mb-3">Subscription Benefits:</h4>
+              <ul className="space-y-2">
+                {SUBSCRIPTION_PLANS[selectedPlan].benefits.map((benefit, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    {benefit}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          {!isActive && (
+            <Button onClick={handleSubscribe} disabled={isLoading}>
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CreditCard className="h-4 w-4 mr-2" />}
+              Subscribe Now
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Delete Confirmation Dialog
+function DeleteConfirmDialog({ open, onOpenChange, professional, onConfirm, isLoading }) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Professional</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete <strong>{professional?.fullName}</strong>? 
+            This action cannot be undone. All data including reviews and subscriptions will be permanently removed.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={() => onConfirm(professional?.id)}
+            className="bg-red-600 hover:bg-red-700"
+            disabled={isLoading}
+          >
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 
@@ -803,6 +1042,9 @@ export default function App() {
   const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false)
   const [isAdminLoginDialogOpen, setIsAdminLoginDialogOpen] = useState(false)
   const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false)
+  const [isSubscriptionDialogOpen, setIsSubscriptionDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [professionalToDelete, setProfessionalToDelete] = useState(null)
 
   // Admin state
   const [adminStats, setAdminStats] = useState(null)
@@ -838,9 +1080,18 @@ export default function App() {
 
   const fetchFeaturedProfessionals = async () => {
     try {
-      const res = await fetch('/api/professionals?limit=6')
-      const data = await res.json()
-      if (data.professionals) setFeaturedProfessionals(data.professionals)
+      // First try to get featured (subscribed) professionals
+      const featuredRes = await fetch('/api/professionals/featured?limit=6')
+      const featuredData = await featuredRes.json()
+      
+      if (featuredData.professionals && featuredData.professionals.length > 0) {
+        setFeaturedProfessionals(featuredData.professionals)
+      } else {
+        // Fallback to approved professionals if no featured ones
+        const res = await fetch('/api/professionals?limit=6')
+        const data = await res.json()
+        if (data.professionals) setFeaturedProfessionals(data.professionals)
+      }
     } catch (error) {
       console.error('Error fetching featured professionals:', error)
     }
@@ -1062,6 +1313,79 @@ export default function App() {
     }
   }
 
+  const handlePhotoUpload = async (imageData) => {
+    if (!token || !user) return
+    
+    try {
+      const res = await fetch('/api/upload/profile-photo', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ imageData })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        // Update local user state with new photo
+        const updatedUser = { ...user, profilePhoto: { url: data.url, publicId: data.publicId } }
+        setUser(updatedUser)
+        localStorage.setItem('expertbridge_user', JSON.stringify(updatedUser))
+        toast.success(data.mocked ? 'Photo upload simulated (Cloudinary not configured)' : 'Profile photo updated!')
+      } else {
+        toast.error(data.error || 'Failed to upload photo')
+      }
+    } catch (error) {
+      toast.error('Failed to upload photo')
+    }
+  }
+
+  const handleSubscribe = async (planId) => {
+    if (!token || !user) return
+    
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/subscriptions/initialize', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ planId })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        if (data.mocked) {
+          // For mock payments, activate directly
+          const activateRes = await fetch('/api/subscriptions/activate', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ planId, reference: data.reference })
+          })
+          const activateData = await activateRes.json()
+          if (activateRes.ok) {
+            setUser(activateData.professional)
+            localStorage.setItem('expertbridge_user', JSON.stringify(activateData.professional))
+            setIsSubscriptionDialogOpen(false)
+            toast.success('Subscription activated! (Paystack not configured - demo mode)')
+          }
+        } else {
+          // Redirect to Paystack
+          window.location.href = data.authorization_url
+        }
+      } else {
+        toast.error(data.error || 'Failed to initialize payment')
+      }
+    } catch (error) {
+      toast.error('Failed to initialize payment')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleLogout = () => {
     setToken(null)
     setUser(null)
@@ -1099,7 +1423,7 @@ export default function App() {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (res.ok) {
-        toast.success('Professional approved!')
+        toast.success('Professional approved! Email notification sent.')
         fetchAdminData(token)
         // Also refresh public data so categories and featured professionals update
         refreshData()
@@ -1122,7 +1446,7 @@ export default function App() {
         body: JSON.stringify({ reason })
       })
       if (res.ok) {
-        toast.success('Professional rejected')
+        toast.success('Professional rejected. Email notification sent.')
         fetchAdminData(token)
       } else {
         toast.error('Failed to reject')
@@ -1131,6 +1455,27 @@ export default function App() {
       toast.error('Failed to reject')
     }
   }, [token, fetchAdminData])
+
+  const handleDeleteProfessional = useCallback(async (professionalId) => {
+    try {
+      const res = await fetch(`/api/admin/professionals/${professionalId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        toast.success('Professional deleted successfully')
+        setIsDeleteDialogOpen(false)
+        setProfessionalToDelete(null)
+        fetchAdminData(token)
+        refreshData()
+      } else {
+        const data = await res.json()
+        toast.error(data.error || 'Failed to delete')
+      }
+    } catch (error) {
+      toast.error('Failed to delete professional')
+    }
+  }, [token, fetchAdminData, refreshData])
 
   const viewProfessionalProfile = async (professionalId) => {
     setIsLoading(true)
@@ -1546,6 +1891,7 @@ export default function App() {
   const renderDashboardView = () => {
     if (!user) return null
     const badge = getProfessionalBadge(user)
+    const hasActiveSubscription = user.subscription?.status === 'active' && new Date(user.subscription?.endDate) > new Date()
 
     return (
       <div className="container py-8">
@@ -1638,9 +1984,14 @@ export default function App() {
                   <span>Location</span>
                   <span>{user.location?.city}, {user.location?.country}</span>
                 </div>
-                {user.verification?.status === 'approved' && !user.featured?.isFeatured && (
+                {user.verification?.status === 'approved' && !hasActiveSubscription && (
                   <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-700 mt-4">
-                    <strong>Upgrade to Verified:</strong> Subscribe to get the Verified badge and appear in the Featured Experts carousel.
+                    <strong>Upgrade to Featured:</strong> Subscribe to get the Verified badge and appear in the Featured Experts carousel.
+                  </div>
+                )}
+                {hasActiveSubscription && (
+                  <div className="p-3 bg-green-50 rounded-lg text-sm text-green-700 mt-4">
+                    <strong>Active Subscription:</strong> Valid until {new Date(user.subscription.endDate).toLocaleDateString()}
                   </div>
                 )}
               </div>
@@ -1656,8 +2007,13 @@ export default function App() {
               <Button className="w-full justify-start" variant="outline" onClick={() => setIsEditProfileDialogOpen(true)}>
                 <Edit className="h-4 w-4 mr-2" /> Edit Profile
               </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Award className="h-4 w-4 mr-2" /> Get Featured (Coming Soon)
+              <Button 
+                className="w-full justify-start" 
+                variant={hasActiveSubscription ? "outline" : "default"}
+                onClick={() => setIsSubscriptionDialogOpen(true)}
+              >
+                <Crown className="h-4 w-4 mr-2" /> 
+                {hasActiveSubscription ? 'View Subscription' : 'Get Featured'}
               </Button>
             </CardContent>
           </Card>
@@ -1678,7 +2034,7 @@ export default function App() {
         </div>
 
         {adminStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <Card>
               <CardContent className="pt-6 text-center">
                 <p className="text-3xl font-bold text-blue-600">{adminStats.stats?.totalProfessionals || 0}</p>
@@ -1701,6 +2057,12 @@ export default function App() {
               <CardContent className="pt-6 text-center">
                 <p className="text-3xl font-bold text-red-600">{adminStats.stats?.rejectedProfessionals || 0}</p>
                 <p className="text-sm text-muted-foreground">Rejected</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <p className="text-3xl font-bold text-purple-600">{adminStats.stats?.featuredProfessionals || 0}</p>
+                <p className="text-sm text-muted-foreground">Featured</p>
               </CardContent>
             </Card>
           </div>
@@ -1745,6 +2107,7 @@ export default function App() {
                         <th className="text-left p-4">Location</th>
                         <th className="text-left p-4">Status</th>
                         <th className="text-left p-4">Joined</th>
+                        <th className="text-left p-4">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1768,9 +2131,27 @@ export default function App() {
                             <Badge variant={professional.verification?.status === 'approved' ? 'default' : professional.verification?.status === 'pending' ? 'secondary' : 'destructive'}>
                               {professional.verification?.status}
                             </Badge>
+                            {professional.featured?.isFeatured && new Date(professional.featured?.featuredUntil) > new Date() && (
+                              <Badge className="ml-2 bg-amber-500">
+                                <Crown className="h-3 w-3 mr-1" />
+                                Featured
+                              </Badge>
+                            )}
                           </td>
                           <td className="p-4 text-sm text-muted-foreground">
                             {new Date(professional.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="p-4">
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => {
+                                setProfessionalToDelete(professional)
+                                setIsDeleteDialogOpen(true)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </td>
                         </tr>
                       ))}
@@ -1963,6 +2344,21 @@ export default function App() {
         onOpenChange={setIsEditProfileDialogOpen} 
         user={user}
         onSave={handleEditProfile}
+        onPhotoUpload={handlePhotoUpload}
+        isLoading={isLoading}
+      />
+      <SubscriptionDialog
+        open={isSubscriptionDialogOpen}
+        onOpenChange={setIsSubscriptionDialogOpen}
+        onSubscribe={handleSubscribe}
+        isLoading={isLoading}
+        currentSubscription={user?.subscription}
+      />
+      <DeleteConfirmDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        professional={professionalToDelete}
+        onConfirm={handleDeleteProfessional}
         isLoading={isLoading}
       />
 
