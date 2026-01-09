@@ -437,14 +437,34 @@ class ExpertBridgeAPITester:
         """Test various error cases"""
         print("\n=== Testing Error Cases ===")
         
+        error_tests_passed = 0
+        total_error_tests = 3
+        
         # Test registration with missing fields
         response = self.make_request('POST', '/auth/register', {"email": "test@test.com"})
         if response and response.status_code == 400:
             self.log_result("Error Case - Missing Fields", True, "Correctly rejected registration with missing fields")
-            return True
+            error_tests_passed += 1
         else:
-            self.log_result("Error Case - Missing Fields", False, "Should reject registration with missing fields")
-            return False
+            self.log_result("Error Case - Missing Fields", False, f"Should reject registration with missing fields. Got status: {response.status_code if response else 'None'}")
+        
+        # Test login with invalid credentials
+        response = self.make_request('POST', '/auth/login', {"email": "invalid@test.com", "password": "wrong"})
+        if response and response.status_code == 401:
+            self.log_result("Error Case - Invalid Login", True, "Correctly rejected invalid login")
+            error_tests_passed += 1
+        else:
+            self.log_result("Error Case - Invalid Login", False, f"Should reject invalid login credentials. Got status: {response.status_code if response else 'None'}")
+        
+        # Test admin endpoint without token
+        response = self.make_request('GET', '/admin/pending')
+        if response and response.status_code == 401:
+            self.log_result("Error Case - Unauthorized Admin", True, "Correctly rejected unauthorized admin access")
+            error_tests_passed += 1
+        else:
+            self.log_result("Error Case - Unauthorized Admin", False, f"Should reject unauthorized admin access. Got status: {response.status_code if response else 'None'}")
+        
+        return error_tests_passed == total_error_tests
     
     def run_all_tests(self):
         """Run all backend tests"""
