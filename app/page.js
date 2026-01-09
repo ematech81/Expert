@@ -1,45 +1,1560 @@
 'use client'
 
-import { useEffect } from "react";
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import { toast } from 'sonner'
+import { 
+  Search, MapPin, Star, Phone, Mail, Globe, Linkedin, Twitter, Instagram,
+  Users, Award, CheckCircle, Clock, Filter, ChevronRight, Menu, X, LogOut,
+  Building, Briefcase, Heart, Shield, TrendingUp, Eye, MousePointer,
+  User, Settings, BarChart3, FileCheck, XCircle, Loader2
+} from 'lucide-react'
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await fetch('/api/');
-      const data = await response.json();
-      console.log(data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+const CATEGORIES = [
+  { name: 'Psychologist', icon: Heart, color: 'bg-pink-500' },
+  { name: 'Lawyer', icon: Briefcase, color: 'bg-slate-700' },
+  { name: 'Financial Advisor', icon: TrendingUp, color: 'bg-emerald-500' },
+  { name: 'Career Coach', icon: Award, color: 'bg-amber-500' },
+  { name: 'Business Consultant', icon: Building, color: 'bg-blue-600' },
+  { name: 'Physiotherapist', icon: Heart, color: 'bg-red-500' },
+  { name: 'Nutritionist', icon: Heart, color: 'bg-green-500' },
+  { name: 'Accountant', icon: BarChart3, color: 'bg-indigo-500' },
+  { name: 'Architect', icon: Building, color: 'bg-orange-500' },
+  { name: 'Marriage Counselor', icon: Heart, color: 'bg-rose-500' },
+  { name: 'Tax Consultant', icon: FileCheck, color: 'bg-teal-500' },
+  { name: 'Real Estate Agent', icon: Building, color: 'bg-cyan-500' },
+  { name: 'IT Consultant', icon: Settings, color: 'bg-purple-500' },
+  { name: 'Marketing Consultant', icon: TrendingUp, color: 'bg-fuchsia-500' },
+  { name: 'HR Consultant', icon: Users, color: 'bg-sky-500' },
+  { name: 'Life Coach', icon: Award, color: 'bg-yellow-500' },
+  { name: 'Immigration Consultant', icon: Globe, color: 'bg-blue-500' },
+  { name: 'Event Planner', icon: Award, color: 'bg-violet-500' },
+  { name: 'Interior Designer', icon: Building, color: 'bg-lime-500' },
+  { name: 'Education Consultant', icon: Award, color: 'bg-emerald-600' }
+]
+
+const HERO_IMAGE = 'https://images.pexels.com/photos/7616608/pexels-photo-7616608.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2'
+
+export default function App() {
+  const [currentView, setCurrentView] = useState('home')
+  const [user, setUser] = useState(null)
+  const [userRole, setUserRole] = useState(null)
+  const [token, setToken] = useState(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [searchParams, setSearchParams] = useState({ category: '', keyword: '', country: '' })
+  const [searchResults, setSearchResults] = useState([])
+  const [selectedProfessional, setSelectedProfessional] = useState(null)
+  const [categories, setCategories] = useState([])
+  const [featuredProfessionals, setFeaturedProfessionals] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [pagination, setPagination] = useState({ page: 1, total: 0, pages: 0 })
+
+  // Auth state
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [isLoginDialogOpen, setIsLoginDialogOpen] = useState(false)
+  const [isRegisterDialogOpen, setIsRegisterDialogOpen] = useState(false)
+  const [isAdminLoginDialogOpen, setIsAdminLoginDialogOpen] = useState(false)
+
+  // Registration form state
+  const [regForm, setRegForm] = useState({
+    fullName: '', email: '', phone: '', password: '', confirmPassword: '',
+    category: '', subcategory: '', bio: '', experience: '',
+    country: '', state: '', city: '',
+    inPerson: false, virtual: true, serviceRadius: 'city',
+    languages: 'English', linkedin: '', twitter: '', website: ''
+  })
+
+  // Admin state
+  const [adminStats, setAdminStats] = useState(null)
+  const [pendingProfessionals, setPendingProfessionals] = useState([])
+  const [allProfessionals, setAllProfessionals] = useState([])
 
   useEffect(() => {
-    helloWorldApi();
-  }, []);
+    // Check for stored token
+    const storedToken = localStorage.getItem('expertbridge_token')
+    const storedUser = localStorage.getItem('expertbridge_user')
+    const storedRole = localStorage.getItem('expertbridge_role')
+    if (storedToken && storedUser) {
+      setToken(storedToken)
+      setUser(JSON.parse(storedUser))
+      setUserRole(storedRole)
+    }
+    fetchCategories()
+    fetchFeaturedProfessionals()
+  }, [])
 
-  return (
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/categories')
+      const data = await res.json()
+      if (data.categories) setCategories(data.categories)
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    }
+  }
+
+  const fetchFeaturedProfessionals = async () => {
+    try {
+      const res = await fetch('/api/professionals?limit=6')
+      const data = await res.json()
+      if (data.professionals) setFeaturedProfessionals(data.professionals)
+    } catch (error) {
+      console.error('Error fetching featured professionals:', error)
+    }
+  }
+
+  const handleSearch = async (params = searchParams, page = 1) => {
+    setIsLoading(true)
+    try {
+      const queryParams = new URLSearchParams()
+      if (params.category) queryParams.append('category', params.category)
+      if (params.keyword) queryParams.append('keyword', params.keyword)
+      if (params.country) queryParams.append('country', params.country)
+      queryParams.append('page', page.toString())
+      queryParams.append('limit', '12')
+
+      const res = await fetch(`/api/search?${queryParams.toString()}`)
+      const data = await res.json()
+      setSearchResults(data.professionals || [])
+      setPagination(data.pagination || { page: 1, total: 0, pages: 0 })
+      setCurrentView('search')
+    } catch (error) {
+      toast.error('Search failed')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleCategoryClick = (categoryName) => {
+    const newParams = { ...searchParams, category: categoryName }
+    setSearchParams(newParams)
+    handleSearch(newParams)
+  }
+
+  const handleLogin = async () => {
+    if (!loginEmail || !loginPassword) {
+      toast.error('Please fill in all fields')
+      return
+    }
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setToken(data.token)
+        setUser(data.professional)
+        setUserRole('professional')
+        localStorage.setItem('expertbridge_token', data.token)
+        localStorage.setItem('expertbridge_user', JSON.stringify(data.professional))
+        localStorage.setItem('expertbridge_role', 'professional')
+        setIsLoginDialogOpen(false)
+        setLoginEmail('')
+        setLoginPassword('')
+        toast.success('Login successful!')
+        setCurrentView('dashboard')
+      } else {
+        toast.error(data.error || 'Login failed')
+      }
+    } catch (error) {
+      toast.error('Login failed')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleAdminLogin = async () => {
+    if (!loginEmail || !loginPassword) {
+      toast.error('Please fill in all fields')
+      return
+    }
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/auth/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setToken(data.token)
+        setUser(data.admin)
+        setUserRole('admin')
+        localStorage.setItem('expertbridge_token', data.token)
+        localStorage.setItem('expertbridge_user', JSON.stringify(data.admin))
+        localStorage.setItem('expertbridge_role', 'admin')
+        setIsAdminLoginDialogOpen(false)
+        setLoginEmail('')
+        setLoginPassword('')
+        toast.success('Admin login successful!')
+        setCurrentView('admin')
+        fetchAdminData(data.token)
+      } else {
+        toast.error(data.error || 'Login failed')
+      }
+    } catch (error) {
+      toast.error('Login failed')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleRegister = async () => {
+    if (regForm.password !== regForm.confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
+    if (!regForm.fullName || !regForm.email || !regForm.password || !regForm.category || !regForm.bio || !regForm.experience) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+    if (regForm.bio.length < 100) {
+      toast.error('Bio must be at least 100 characters')
+      return
+    }
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: regForm.fullName,
+          email: regForm.email,
+          phone: regForm.phone,
+          password: regForm.password,
+          category: regForm.category,
+          subcategory: regForm.subcategory,
+          bio: regForm.bio,
+          experience: regForm.experience,
+          location: {
+            country: regForm.country,
+            state: regForm.state,
+            city: regForm.city
+          },
+          serviceOptions: {
+            inPerson: regForm.inPerson,
+            virtual: regForm.virtual,
+            serviceRadius: regForm.serviceRadius
+          },
+          languages: regForm.languages.split(',').map(l => l.trim()),
+          socialLinks: {
+            linkedin: regForm.linkedin,
+            twitter: regForm.twitter,
+            website: regForm.website
+          }
+        })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setToken(data.token)
+        setUser(data.professional)
+        setUserRole('professional')
+        localStorage.setItem('expertbridge_token', data.token)
+        localStorage.setItem('expertbridge_user', JSON.stringify(data.professional))
+        localStorage.setItem('expertbridge_role', 'professional')
+        setIsRegisterDialogOpen(false)
+        toast.success('Registration successful! Your profile is pending approval.')
+        setCurrentView('dashboard')
+      } else {
+        toast.error(data.error || 'Registration failed')
+      }
+    } catch (error) {
+      toast.error('Registration failed')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleLogout = () => {
+    setToken(null)
+    setUser(null)
+    setUserRole(null)
+    localStorage.removeItem('expertbridge_token')
+    localStorage.removeItem('expertbridge_user')
+    localStorage.removeItem('expertbridge_role')
+    setCurrentView('home')
+    toast.success('Logged out successfully')
+  }
+
+  const fetchAdminData = async (authToken) => {
+    const headers = { 'Authorization': `Bearer ${authToken || token}` }
+    try {
+      const [statsRes, pendingRes, allRes] = await Promise.all([
+        fetch('/api/admin/stats', { headers }),
+        fetch('/api/admin/pending', { headers }),
+        fetch('/api/admin/professionals?limit=50', { headers })
+      ])
+      const statsData = await statsRes.json()
+      const pendingData = await pendingRes.json()
+      const allData = await allRes.json()
+      setAdminStats(statsData)
+      setPendingProfessionals(pendingData.pending || [])
+      setAllProfessionals(allData.professionals || [])
+    } catch (error) {
+      console.error('Error fetching admin data:', error)
+    }
+  }
+
+  const handleApprove = async (professionalId) => {
+    try {
+      const res = await fetch(`/api/admin/approve/${professionalId}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        toast.success('Professional approved!')
+        fetchAdminData()
+      }
+    } catch (error) {
+      toast.error('Failed to approve')
+    }
+  }
+
+  const handleReject = async (professionalId, reason) => {
+    try {
+      const res = await fetch(`/api/admin/reject/${professionalId}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason })
+      })
+      if (res.ok) {
+        toast.success('Professional rejected')
+        fetchAdminData()
+      }
+    } catch (error) {
+      toast.error('Failed to reject')
+    }
+  }
+
+  const viewProfessionalProfile = async (professionalId) => {
+    setIsLoading(true)
+    try {
+      const res = await fetch(`/api/professionals/${professionalId}`)
+      const data = await res.json()
+      setSelectedProfessional(data)
+      setCurrentView('profile')
+    } catch (error) {
+      toast.error('Failed to load profile')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const trackContactClick = async (professionalId) => {
+    try {
+      await fetch(`/api/professionals/${professionalId}/contact`, { method: 'POST' })
+    } catch (error) {
+      console.error('Failed to track contact click')
+    }
+  }
+
+  // Header Component
+  const Header = () => (
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-16 items-center justify-between">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('home')}>
+          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
+            <span className="text-white font-bold text-sm">EB</span>
+          </div>
+          <span className="font-bold text-xl hidden sm:block">ExpertBridge</span>
+        </div>
+
+        <nav className="hidden md:flex items-center gap-6">
+          <button onClick={() => setCurrentView('home')} className="text-sm font-medium hover:text-primary transition-colors">
+            Home
+          </button>
+          <button onClick={() => handleSearch({ category: '', keyword: '', country: '' })} className="text-sm font-medium hover:text-primary transition-colors">
+            Find Experts
+          </button>
+          <button onClick={() => setCurrentView('about')} className="text-sm font-medium hover:text-primary transition-colors">
+            About
+          </button>
+        </nav>
+
+        <div className="flex items-center gap-3">
+          {user ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setCurrentView(userRole === 'admin' ? 'admin' : 'dashboard')}>
+                <User className="h-4 w-4 mr-2" />
+                {user.fullName?.split(' ')[0] || 'Dashboard'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Dialog open={isLoginDialogOpen} onOpenChange={setIsLoginDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm">Login</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Professional Login</DialogTitle>
+                    <DialogDescription>Sign in to your ExpertBridge account</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="login-email">Email</Label>
+                      <Input id="login-email" type="email" placeholder="you@example.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="login-password">Password</Label>
+                      <Input id="login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleLogin} disabled={isLoading}>
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isRegisterDialogOpen} onOpenChange={setIsRegisterDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">Join as Expert</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Join ExpertBridge</DialogTitle>
+                    <DialogDescription>Create your professional profile and connect with clients globally</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-name">Full Name *</Label>
+                        <Input id="reg-name" placeholder="John Doe" value={regForm.fullName} onChange={(e) => setRegForm({...regForm, fullName: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-email">Email *</Label>
+                        <Input id="reg-email" type="email" placeholder="you@example.com" value={regForm.email} onChange={(e) => setRegForm({...regForm, email: e.target.value})} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-phone">Phone</Label>
+                        <Input id="reg-phone" placeholder="+1234567890" value={regForm.phone} onChange={(e) => setRegForm({...regForm, phone: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-category">Category *</Label>
+                        <Select value={regForm.category} onValueChange={(value) => setRegForm({...regForm, category: value})}>
+                          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                          <SelectContent>
+                            {CATEGORIES.map(cat => (
+                              <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-subcategory">Specialization</Label>
+                        <Input id="reg-subcategory" placeholder="e.g., Corporate Lawyer" value={regForm.subcategory} onChange={(e) => setRegForm({...regForm, subcategory: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-experience">Years of Experience *</Label>
+                        <Input id="reg-experience" type="number" min="0" placeholder="5" value={regForm.experience} onChange={(e) => setRegForm({...regForm, experience: e.target.value})} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reg-bio">Professional Bio * (min 100 chars)</Label>
+                      <Textarea id="reg-bio" placeholder="Describe your expertise, qualifications, and what makes you unique..." className="min-h-[100px]" value={regForm.bio} onChange={(e) => setRegForm({...regForm, bio: e.target.value})} />
+                      <p className="text-xs text-muted-foreground">{regForm.bio.length}/100 characters minimum</p>
+                    </div>
+                    <Separator />
+                    <h4 className="font-medium">Location</h4>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-country">Country *</Label>
+                        <Input id="reg-country" placeholder="Nigeria" value={regForm.country} onChange={(e) => setRegForm({...regForm, country: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-state">State/Region *</Label>
+                        <Input id="reg-state" placeholder="Lagos" value={regForm.state} onChange={(e) => setRegForm({...regForm, state: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-city">City *</Label>
+                        <Input id="reg-city" placeholder="Lagos" value={regForm.city} onChange={(e) => setRegForm({...regForm, city: e.target.value})} />
+                      </div>
+                    </div>
+                    <Separator />
+                    <h4 className="font-medium">Service Options</h4>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="reg-virtual" checked={regForm.virtual} onCheckedChange={(checked) => setRegForm({...regForm, virtual: checked})} />
+                        <Label htmlFor="reg-virtual">Virtual consultations</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="reg-inperson" checked={regForm.inPerson} onCheckedChange={(checked) => setRegForm({...regForm, inPerson: checked})} />
+                        <Label htmlFor="reg-inperson">In-person meetings</Label>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reg-languages">Languages (comma-separated)</Label>
+                      <Input id="reg-languages" placeholder="English, French, Yoruba" value={regForm.languages} onChange={(e) => setRegForm({...regForm, languages: e.target.value})} />
+                    </div>
+                    <Separator />
+                    <h4 className="font-medium">Password</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-password">Password *</Label>
+                        <Input id="reg-password" type="password" placeholder="••••••••" value={regForm.password} onChange={(e) => setRegForm({...regForm, password: e.target.value})} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reg-confirm">Confirm Password *</Label>
+                        <Input id="reg-confirm" type="password" placeholder="••••••••" value={regForm.confirmPassword} onChange={(e) => setRegForm({...regForm, confirmPassword: e.target.value})} />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleRegister} disabled={isLoading} className="w-full">
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Create Profile
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isAdminLoginDialogOpen} onOpenChange={setIsAdminLoginDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">Admin</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Admin Login</DialogTitle>
+                    <DialogDescription>Sign in to the admin dashboard</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-email">Email</Label>
+                      <Input id="admin-email" type="email" placeholder="admin@expertbridge.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-password">Password</Label>
+                      <Input id="admin-password" type="password" placeholder="••••••••" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={handleAdminLogin} disabled={isLoading}>
+                      {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign In'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
+
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {isMenuOpen && (
+        <div className="md:hidden border-t p-4 space-y-2">
+          <button onClick={() => { setCurrentView('home'); setIsMenuOpen(false); }} className="block w-full text-left py-2">Home</button>
+          <button onClick={() => { handleSearch({ category: '', keyword: '', country: '' }); setIsMenuOpen(false); }} className="block w-full text-left py-2">Find Experts</button>
+          <button onClick={() => { setCurrentView('about'); setIsMenuOpen(false); }} className="block w-full text-left py-2">About</button>
+        </div>
+      )}
+    </header>
+  )
+
+  // Footer Component
+  const Footer = () => (
+    <footer className="border-t bg-muted/40">
+      <div className="container py-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
+                <span className="text-white font-bold text-sm">EB</span>
+              </div>
+              <span className="font-bold">ExpertBridge</span>
+            </div>
+            <p className="text-sm text-muted-foreground">Connecting clients with verified professionals worldwide.</p>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">Categories</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              {CATEGORIES.slice(0, 5).map(cat => (
+                <li key={cat.name}>
+                  <button onClick={() => handleCategoryClick(cat.name)} className="hover:text-primary transition-colors">{cat.name}</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">Company</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li><button onClick={() => setCurrentView('about')} className="hover:text-primary">About Us</button></li>
+              <li><button className="hover:text-primary">How It Works</button></li>
+              <li><button className="hover:text-primary">Contact</button></li>
+              <li><button className="hover:text-primary">Terms of Service</button></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">For Professionals</h4>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li><button onClick={() => setIsRegisterDialogOpen(true)} className="hover:text-primary">Join as Expert</button></li>
+              <li><button className="hover:text-primary">Pricing</button></li>
+              <li><button className="hover:text-primary">Success Stories</button></li>
+            </ul>
+          </div>
+        </div>
+        <Separator className="my-8" />
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+          <p>© 2025 ExpertBridge. All rights reserved.</p>
+          <div className="flex gap-4">
+            <button className="hover:text-primary">Privacy Policy</button>
+            <button className="hover:text-primary">Terms</button>
+          </div>
+        </div>
+      </div>
+    </footer>
+  )
+
+  // Professional Card Component
+  const ProfessionalCard = ({ professional, onClick }) => (
+    <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group" onClick={onClick}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-4">
+          <Avatar className="h-16 w-16 border-2 border-primary/10">
+            <AvatarImage src={professional.profilePhoto?.url} alt={professional.fullName} />
+            <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+              {professional.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-lg truncate">{professional.fullName}</CardTitle>
+              {professional.verification?.status === 'approved' && (
+                <CheckCircle className="h-4 w-4 text-blue-500 flex-shrink-0" />
+              )}
+            </div>
+            <CardDescription className="flex items-center gap-1">
+              <Badge variant="secondary" className="font-normal">{professional.category}</Badge>
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pb-3">
+        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{professional.bio}</p>
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            {professional.location?.city}, {professional.location?.country}
+          </span>
+          <span className="flex items-center gap-1">
+            <Briefcase className="h-3 w-3" />
+            {professional.experience} years
+          </span>
+          {professional.ratings?.count > 0 && (
+            <span className="flex items-center gap-1">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              {professional.ratings.average} ({professional.ratings.count})
+            </span>
+          )}
+        </div>
+      </CardContent>
+      <CardFooter className="pt-0">
+        <div className="flex gap-2">
+          {professional.serviceOptions?.virtual && <Badge variant="outline" className="text-xs">Virtual</Badge>}
+          {professional.serviceOptions?.inPerson && <Badge variant="outline" className="text-xs">In-Person</Badge>}
+        </div>
+      </CardFooter>
+    </Card>
+  )
+
+  // Home View
+  const HomeView = () => (
     <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" alt="Emergent" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white">
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-30"></div>
+        <div className="container relative py-20 md:py-32">
+          <div className="max-w-3xl">
+            <Badge className="mb-4 bg-white/20 text-white border-white/30 hover:bg-white/30">🌍 Connecting professionals globally</Badge>
+            <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
+              Find Verified <span className="text-blue-200">Professionals</span> You Can Trust
+            </h1>
+            <p className="text-xl text-blue-100 mb-8 max-w-2xl">
+              ExpertBridge connects you with verified experts across 20+ categories — lawyers, psychologists, financial advisors, and more. Virtual or in-person, anywhere in the world.
+            </p>
+            
+            {/* Search Box */}
+            <Card className="p-2 bg-white/95 backdrop-blur">
+              <div className="flex flex-col md:flex-row gap-2">
+                <div className="flex-1">
+                  <Select value={searchParams.category} onValueChange={(value) => setSearchParams({...searchParams, category: value})}>
+                    <SelectTrigger className="border-0 bg-transparent">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {CATEGORIES.map(cat => (
+                        <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1">
+                  <Input 
+                    placeholder="Location (city or country)" 
+                    className="border-0 bg-transparent"
+                    value={searchParams.country}
+                    onChange={(e) => setSearchParams({...searchParams, country: e.target.value})}
+                  />
+                </div>
+                <Button size="lg" onClick={() => handleSearch()} className="px-8">
+                  <Search className="h-4 w-4 mr-2" />
+                  Search
+                </Button>
+              </div>
+            </Card>
 
-function App() {
+            <div className="flex flex-wrap gap-4 mt-8 text-sm">
+              <span className="flex items-center gap-2"><CheckCircle className="h-4 w-4" /> Verified Professionals</span>
+              <span className="flex items-center gap-2"><Shield className="h-4 w-4" /> Secure Platform</span>
+              <span className="flex items-center gap-2"><Globe className="h-4 w-4" /> Global Network</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Categories Section */}
+      <section className="py-16 bg-muted/30">
+        <div className="container">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">Browse by Category</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Find the right professional for your needs from our diverse range of expert categories
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {CATEGORIES.map((category) => {
+              const Icon = category.icon
+              const catData = categories.find(c => c.name === category.name)
+              return (
+                <Card 
+                  key={category.name} 
+                  className="cursor-pointer hover:shadow-md transition-all hover:-translate-y-1 group"
+                  onClick={() => handleCategoryClick(category.name)}
+                >
+                  <CardContent className="p-4 text-center">
+                    <div className={`w-12 h-12 mx-auto mb-3 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                      <Icon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="font-medium text-sm mb-1">{category.name}</h3>
+                    <p className="text-xs text-muted-foreground">{catData?.count || 0} experts</p>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Professionals */}
+      {featuredProfessionals.length > 0 && (
+        <section className="py-16">
+          <div className="container">
+            <div className="flex justify-between items-center mb-8">
+              <div>
+                <h2 className="text-3xl font-bold mb-2">Featured Professionals</h2>
+                <p className="text-muted-foreground">Top-rated experts ready to help you</p>
+              </div>
+              <Button variant="outline" onClick={() => handleSearch()}>
+                View All <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredProfessionals.map((professional) => (
+                <ProfessionalCard 
+                  key={professional.id} 
+                  professional={professional} 
+                  onClick={() => viewProfessionalProfile(professional.id)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* How It Works */}
+      <section className="py-16 bg-muted/30">
+        <div className="container">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">How It Works</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Connect with the right professional in three simple steps
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="text-center">
+              <CardContent className="pt-8">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Search className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">1. Search</h3>
+                <p className="text-muted-foreground">Browse our network of verified professionals by category, location, or specialty.</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center">
+              <CardContent className="pt-8">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+                  <Users className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">2. Compare</h3>
+                <p className="text-muted-foreground">Review profiles, credentials, ratings, and choose the expert that fits your needs.</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center">
+              <CardContent className="pt-8">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
+                  <Phone className="h-8 w-8 text-purple-600" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">3. Connect</h3>
+                <p className="text-muted-foreground">Contact professionals directly via phone, email, or schedule a virtual consultation.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-16 bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
+        <div className="container text-center">
+          <h2 className="text-3xl font-bold mb-4">Are You a Professional?</h2>
+          <p className="text-blue-100 mb-8 max-w-2xl mx-auto">
+            Join thousands of professionals on ExpertBridge and connect with clients worldwide. 
+            Create your verified profile today and grow your practice.
+          </p>
+          <Button size="lg" variant="secondary" onClick={() => setIsRegisterDialogOpen(true)}>
+            Join as an Expert <ChevronRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
+      </section>
+    </div>
+  )
+
+  // Search Results View
+  const SearchView = () => (
+    <div className="container py-8">
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Filters Sidebar */}
+        <aside className="lg:w-64 flex-shrink-0">
+          <Card className="sticky top-24">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Filter className="h-4 w-4" /> Filters
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={searchParams.category} onValueChange={(value) => setSearchParams({...searchParams, category: value})}>
+                  <SelectTrigger><SelectValue placeholder="All categories" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {CATEGORIES.map(cat => (
+                      <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Location</Label>
+                <Input 
+                  placeholder="City or country" 
+                  value={searchParams.country}
+                  onChange={(e) => setSearchParams({...searchParams, country: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Keyword</Label>
+                <Input 
+                  placeholder="Search by name or skill" 
+                  value={searchParams.keyword}
+                  onChange={(e) => setSearchParams({...searchParams, keyword: e.target.value})}
+                />
+              </div>
+              <Button className="w-full" onClick={() => handleSearch()}>
+                Apply Filters
+              </Button>
+            </CardContent>
+          </Card>
+        </aside>
+
+        {/* Results */}
+        <main className="flex-1">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-2xl font-bold">Search Results</h1>
+              <p className="text-muted-foreground">{pagination.total} professionals found</p>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : searchResults.length === 0 ? (
+            <Card className="p-12 text-center">
+              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">No professionals found</h3>
+              <p className="text-muted-foreground mb-4">Try adjusting your filters or search criteria</p>
+              <Button variant="outline" onClick={() => {
+                setSearchParams({ category: '', keyword: '', country: '' })
+                handleSearch({ category: '', keyword: '', country: '' })
+              }}>
+                Clear Filters
+              </Button>
+            </Card>
+          ) : (
+            <>
+              <div className="grid md:grid-cols-2 gap-6">
+                {searchResults.map((professional) => (
+                  <ProfessionalCard 
+                    key={professional.id} 
+                    professional={professional} 
+                    onClick={() => viewProfessionalProfile(professional.id)}
+                  />
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {pagination.pages > 1 && (
+                <div className="flex justify-center gap-2 mt-8">
+                  {Array.from({ length: pagination.pages }, (_, i) => i + 1).map((page) => (
+                    <Button 
+                      key={page} 
+                      variant={page === pagination.page ? 'default' : 'outline'} 
+                      size="sm"
+                      onClick={() => handleSearch(searchParams, page)}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  )
+
+  // Professional Profile View
+  const ProfileView = () => {
+    const professional = selectedProfessional?.professional
+    const reviews = selectedProfessional?.reviews || []
+    const [showReviewForm, setShowReviewForm] = useState(false)
+    const [reviewForm, setReviewForm] = useState({ clientName: '', clientEmail: '', rating: 5, comment: '' })
+
+    const submitReview = async () => {
+      if (!reviewForm.clientName || !reviewForm.clientEmail || !reviewForm.comment) {
+        toast.error('Please fill in all fields')
+        return
+      }
+      try {
+        const res = await fetch('/api/reviews', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...reviewForm, professionalId: professional.id })
+        })
+        if (res.ok) {
+          toast.success('Review submitted for approval')
+          setShowReviewForm(false)
+          setReviewForm({ clientName: '', clientEmail: '', rating: 5, comment: '' })
+        }
+      } catch (error) {
+        toast.error('Failed to submit review')
+      }
+    }
+
+    if (!professional) return null
+
+    return (
+      <div className="container py-8">
+        <Button variant="ghost" className="mb-6" onClick={() => setCurrentView('search')}>
+          ← Back to Search
+        </Button>
+
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Main Profile */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <Avatar className="h-32 w-32 border-4 border-primary/10">
+                    <AvatarImage src={professional.profilePhoto?.url} alt={professional.fullName} />
+                    <AvatarFallback className="text-3xl bg-primary/10 text-primary">
+                      {professional.fullName?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h1 className="text-3xl font-bold">{professional.fullName}</h1>
+                      {professional.verification?.status === 'approved' && (
+                        <Badge className="bg-blue-500">
+                          <CheckCircle className="h-3 w-3 mr-1" /> Verified
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-lg text-muted-foreground mb-2">{professional.category}</p>
+                    {professional.subcategory && (
+                      <p className="text-sm text-muted-foreground mb-4">{professional.subcategory}</p>
+                    )}
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        {professional.location?.city}, {professional.location?.state}, {professional.location?.country}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                        {professional.experience} years experience
+                      </span>
+                      {professional.ratings?.count > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                          {professional.ratings.average} ({professional.ratings.count} reviews)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* About */}
+            <Card>
+              <CardHeader>
+                <CardTitle>About</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="whitespace-pre-wrap">{professional.bio}</p>
+              </CardContent>
+            </Card>
+
+            {/* Services */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Services Offered</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-3">
+                  {professional.serviceOptions?.virtual && (
+                    <Badge variant="outline" className="px-4 py-2">
+                      <Globe className="h-4 w-4 mr-2" /> Virtual Consultations
+                    </Badge>
+                  )}
+                  {professional.serviceOptions?.inPerson && (
+                    <Badge variant="outline" className="px-4 py-2">
+                      <MapPin className="h-4 w-4 mr-2" /> In-Person Meetings
+                    </Badge>
+                  )}
+                </div>
+                {professional.languages?.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-muted-foreground mb-2">Languages:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {professional.languages.map((lang) => (
+                        <Badge key={lang} variant="secondary">{lang}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Reviews */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Reviews ({reviews.length})</CardTitle>
+                <Button size="sm" onClick={() => setShowReviewForm(!showReviewForm)}>
+                  Write a Review
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {showReviewForm && (
+                  <Card className="mb-6 border-dashed">
+                    <CardContent className="pt-4 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Your Name</Label>
+                          <Input value={reviewForm.clientName} onChange={(e) => setReviewForm({...reviewForm, clientName: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Your Email</Label>
+                          <Input type="email" value={reviewForm.clientEmail} onChange={(e) => setReviewForm({...reviewForm, clientEmail: e.target.value})} />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Rating</Label>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button key={star} onClick={() => setReviewForm({...reviewForm, rating: star})}>
+                              <Star className={`h-6 w-6 ${star <= reviewForm.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Your Review</Label>
+                        <Textarea value={reviewForm.comment} onChange={(e) => setReviewForm({...reviewForm, comment: e.target.value})} placeholder="Share your experience..." />
+                      </div>
+                      <Button onClick={submitReview}>Submit Review</Button>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {reviews.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No reviews yet. Be the first to review!</p>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
+                      <div key={review.id} className="border-b pb-4 last:border-0">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-medium">{review.clientName}</p>
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star key={star} className={`h-4 w-4 ${star <= review.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground'}`} />
+                              ))}
+                            </div>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{new Date(review.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{review.comment}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar - Contact */}
+          <div className="space-y-6">
+            <Card className="sticky top-24">
+              <CardHeader>
+                <CardTitle>Contact {professional.fullName?.split(' ')[0]}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {professional.phone && (
+                  <Button className="w-full" onClick={() => { trackContactClick(professional.id); window.location.href = `tel:${professional.phone}` }}>
+                    <Phone className="h-4 w-4 mr-2" /> Call Now
+                  </Button>
+                )}
+                <Button variant="outline" className="w-full" onClick={() => { trackContactClick(professional.id); window.location.href = `mailto:${professional.email}` }}>
+                  <Mail className="h-4 w-4 mr-2" /> Send Email
+                </Button>
+
+                {(professional.socialLinks?.linkedin || professional.socialLinks?.twitter || professional.socialLinks?.website) && (
+                  <>
+                    <Separator />
+                    <p className="text-sm font-medium">Social Links</p>
+                    <div className="flex gap-2">
+                      {professional.socialLinks?.linkedin && (
+                        <Button variant="outline" size="icon" onClick={() => window.open(professional.socialLinks.linkedin, '_blank')}>
+                          <Linkedin className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {professional.socialLinks?.twitter && (
+                        <Button variant="outline" size="icon" onClick={() => window.open(professional.socialLinks.twitter, '_blank')}>
+                          <Twitter className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {professional.socialLinks?.website && (
+                        <Button variant="outline" size="icon" onClick={() => window.open(professional.socialLinks.website, '_blank')}>
+                          <Globe className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Professional Dashboard View
+  const DashboardView = () => {
+    if (!user) return null
+
+    return (
+      <div className="container py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Welcome, {user.fullName}</h1>
+          <p className="text-muted-foreground">Manage your professional profile and track your performance</p>
+        </div>
+
+        <div className="grid md:grid-cols-4 gap-4 mb-8">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-blue-100">
+                  <Eye className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{user.analytics?.profileViews || 0}</p>
+                  <p className="text-sm text-muted-foreground">Profile Views</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-green-100">
+                  <MousePointer className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{user.analytics?.contactClicks || 0}</p>
+                  <p className="text-sm text-muted-foreground">Contact Clicks</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-amber-100">
+                  <Star className="h-6 w-6 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{user.ratings?.average || 0}</p>
+                  <p className="text-sm text-muted-foreground">Average Rating</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-purple-100">
+                  <Award className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{user.ratings?.count || 0}</p>
+                  <p className="text-sm text-muted-foreground">Total Reviews</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Profile Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Profile Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span>Verification Status</span>
+                  <Badge variant={user.verification?.status === 'approved' ? 'default' : user.verification?.status === 'pending' ? 'secondary' : 'destructive'}>
+                    {user.verification?.status === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
+                    {user.verification?.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                    {user.verification?.status === 'rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                    {user.verification?.status?.charAt(0).toUpperCase() + user.verification?.status?.slice(1)}
+                  </Badge>
+                </div>
+                {user.verification?.status === 'rejected' && user.verification?.rejectionReason && (
+                  <div className="p-3 bg-destructive/10 rounded-lg text-sm text-destructive">
+                    <strong>Rejection Reason:</strong> {user.verification.rejectionReason}
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span>Category</span>
+                  <Badge variant="outline">{user.category}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Experience</span>
+                  <span>{user.experience} years</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Location</span>
+                  <span>{user.location?.city}, {user.location?.country}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button className="w-full justify-start" variant="outline" onClick={() => viewProfessionalProfile(user.id)}>
+                <Eye className="h-4 w-4 mr-2" /> View Public Profile
+              </Button>
+              <Button className="w-full justify-start" variant="outline">
+                <Settings className="h-4 w-4 mr-2" /> Edit Profile
+              </Button>
+              <Button className="w-full justify-start" variant="outline">
+                <Award className="h-4 w-4 mr-2" /> Get Featured
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
+  // Admin Dashboard View
+  const AdminView = () => {
+    useEffect(() => {
+      if (userRole === 'admin' && token) {
+        fetchAdminData()
+      }
+    }, [userRole, token])
+
+    if (!user || userRole !== 'admin') return null
+
+    return (
+      <div className="container py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
+          <p className="text-muted-foreground">Manage professionals and platform settings</p>
+        </div>
+
+        {/* Stats */}
+        {adminStats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <p className="text-3xl font-bold text-blue-600">{adminStats.stats?.totalProfessionals || 0}</p>
+                <p className="text-sm text-muted-foreground">Total Professionals</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <p className="text-3xl font-bold text-amber-600">{adminStats.stats?.pendingApprovals || 0}</p>
+                <p className="text-sm text-muted-foreground">Pending Approvals</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <p className="text-3xl font-bold text-green-600">{adminStats.stats?.approvedProfessionals || 0}</p>
+                <p className="text-sm text-muted-foreground">Approved</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <p className="text-3xl font-bold text-red-600">{adminStats.stats?.rejectedProfessionals || 0}</p>
+                <p className="text-sm text-muted-foreground">Rejected</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        <Tabs defaultValue="pending">
+          <TabsList className="mb-4">
+            <TabsTrigger value="pending">Pending Approvals ({pendingProfessionals.length})</TabsTrigger>
+            <TabsTrigger value="all">All Professionals</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending">
+            {pendingProfessionals.length === 0 ? (
+              <Card className="p-12 text-center">
+                <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                <h3 className="text-lg font-semibold">All caught up!</h3>
+                <p className="text-muted-foreground">No pending approvals at the moment.</p>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {pendingProfessionals.map((professional) => (
+                  <Card key={professional.id}>
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <Avatar className="h-16 w-16">
+                            <AvatarImage src={professional.profilePhoto?.url} />
+                            <AvatarFallback>{professional.fullName?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-semibold text-lg">{professional.fullName}</h3>
+                            <p className="text-muted-foreground">{professional.category} • {professional.experience} years</p>
+                            <p className="text-sm text-muted-foreground">{professional.location?.city}, {professional.location?.country}</p>
+                            <p className="text-sm text-muted-foreground">{professional.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => handleApprove(professional.id)}>
+                            <CheckCircle className="h-4 w-4 mr-1" /> Approve
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleReject(professional.id, 'Does not meet verification requirements')}>
+                            <XCircle className="h-4 w-4 mr-1" /> Reject
+                          </Button>
+                        </div>
+                      </div>
+                      <Separator className="my-4" />
+                      <p className="text-sm line-clamp-3">{professional.bio}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="all">
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b">
+                      <tr>
+                        <th className="text-left p-4">Professional</th>
+                        <th className="text-left p-4">Category</th>
+                        <th className="text-left p-4">Location</th>
+                        <th className="text-left p-4">Status</th>
+                        <th className="text-left p-4">Joined</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allProfessionals.map((professional) => (
+                        <tr key={professional.id} className="border-b last:border-0 hover:bg-muted/50">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={professional.profilePhoto?.url} />
+                                <AvatarFallback>{professional.fullName?.slice(0, 2).toUpperCase()}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{professional.fullName}</p>
+                                <p className="text-sm text-muted-foreground">{professional.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">{professional.category}</td>
+                          <td className="p-4">{professional.location?.city}, {professional.location?.country}</td>
+                          <td className="p-4">
+                            <Badge variant={professional.verification?.status === 'approved' ? 'default' : professional.verification?.status === 'pending' ? 'secondary' : 'destructive'}>
+                              {professional.verification?.status}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-sm text-muted-foreground">
+                            {new Date(professional.createdAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    )
+  }
+
+  // About View
+  const AboutView = () => (
+    <div className="container py-16">
+      <div className="max-w-3xl mx-auto text-center mb-12">
+        <h1 className="text-4xl font-bold mb-4">About ExpertBridge</h1>
+        <p className="text-xl text-muted-foreground">
+          Connecting clients with verified professionals across the globe
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-12 items-center mb-16">
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Our Mission</h2>
+          <p className="text-muted-foreground mb-4">
+            ExpertBridge was founded with a simple mission: to make it easy for anyone, anywhere in the world, 
+            to find and connect with verified professionals they can trust.
+          </p>
+          <p className="text-muted-foreground">
+            Whether you need a lawyer in Lagos, a financial advisor in London, or a psychologist in Johannesburg, 
+            ExpertBridge helps you discover qualified experts who can help you achieve your goals.
+          </p>
+        </div>
+        <div className="bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl p-8">
+          <img 
+            src="https://images.unsplash.com/photo-1580983558189-84200466afb8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzh8MHwxfHNlYXJjaHwzfHxidXNpbmVzcyUyMHRlYW18ZW58MHx8fGJsdWV8MTc2NzkwNzYxM3ww&ixlib=rb-4.1.0&q=85&w=600" 
+            alt="Professional team" 
+            className="rounded-xl shadow-lg"
+          />
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-8">
+        <Card>
+          <CardContent className="pt-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
+              <Shield className="h-8 w-8 text-blue-600" />
+            </div>
+            <h3 className="font-semibold text-lg mb-2">Verified Professionals</h3>
+            <p className="text-muted-foreground">Every professional on our platform goes through a verification process to ensure quality and trust.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+              <Globe className="h-8 w-8 text-green-600" />
+            </div>
+            <h3 className="font-semibold text-lg mb-2">Global Network</h3>
+            <p className="text-muted-foreground">Find experts anywhere in the world, with virtual consultation options for maximum flexibility.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
+              <Users className="h-8 w-8 text-purple-600" />
+            </div>
+            <h3 className="font-semibold text-lg mb-2">20+ Categories</h3>
+            <p className="text-muted-foreground">From lawyers to life coaches, find the right professional for any need across diverse categories.</p>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+
+  // Main render
   return (
-    <div className="App">
-      <Home />
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1">
+        {currentView === 'home' && <HomeView />}
+        {currentView === 'search' && <SearchView />}
+        {currentView === 'profile' && <ProfileView />}
+        {currentView === 'dashboard' && <DashboardView />}
+        {currentView === 'admin' && <AdminView />}
+        {currentView === 'about' && <AboutView />}
+      </main>
+      <Footer />
     </div>
-  );
+  )
 }
-
-export default App;
